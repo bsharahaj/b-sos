@@ -1,4 +1,6 @@
-// Models are added per feature (see CLAUDE.md §5). Run `npx prisma migrate dev --name <name>` after edits.
+// Data model — see CLAUDE.md §5. After edits run `npx prisma migrate dev --name <short-name>`.
+// Tables and columns are mapped to snake_case so raw SQL (FOR UPDATE, PostGIS later) reads naturally.
+// Enum values must stay in sync with shared/constants.js.
 
 generator client {
   provider = "prisma-client-js"
@@ -7,4 +9,257 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ---------- Enums ----------
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum SosType {
+  MEDICAL
+  VEHICLE
+  TRANSPORT
+  SAFETY
+  OTHER
+}
+
+enum SosStatus {
+  OPEN
+  ACCEPTED
+  EN_ROUTE
+  ARRIVED
+  RESOLVED
+  CANCELLED
+}
+
+enum VerificationStatus {
+  NONE
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum NotificationChannel {
+  SOCKET
+  PUSH
+}
+
+enum NotificationResponse {
+  NONE
+  ACCEPT
+  DECLINE
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWED
+  DISMISSED
+}
+
+// ---------- Models ----------
+
+model User {
+  id                  String   @id @default(uuid())
+  email               String   @unique
+  passwordHash        String   @map("password_hash")
+  name                String
+  phone               String?  @unique
+  phoneVerified       Boolean  @default(false) @map("phone_verified")
+  photoUrl            String?  @map("photo_url")
+  role                Role     @default(USER)
+  isBanned            Boolean  @default(false) @map("is_banned")
+  isSuspended         Boolean  @default(false) @map("is_suspended")
+  ratingAvg           Float    @default(0) @map("rating_avg")
+  ratingCount         Int      @default(0) @map("rating_count")
+  trustedContactPhone String?  @map("trusted_contact_phone")
+  fcmToken            String?  @map("fcm_token")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  helperProfile     HelperProfile?
+  sosRequested      SosRequest[]      @relation("SosRequester")
+  sosHelped         SosRequest[]      @relation("SosHelper")
+  sosCancelled      SosRequest[]      @relation("SosCancelledBy")
+  notifications     SosNotification[]
+  locationUpdates   LocationUpdate[]
+  messagesSent      Message[]
+  ratingsGiven      Rating[]          @relation("RatingFrom")
+  ratingsReceived   Rating[]          @relation("RatingTo")
+  reportsFiled      Report[]          @relation("ReportReporter")
+  reportsAgainst    Report[]          @relation("ReportReported")
+  adminActionsTaken AdminAction[]     @relation("AdminActor")
+  adminActionsOn    AdminAction[]     @relation("AdminTarget")
+
+  @@map("users")
+}
+
+model HelperProfile {
+  id                 String             @id @default(uuid())
+  userId             String             @unique @map("user_id")
+  skills             String[]           @default([]) // values from SKILLS in shared/constants.js
+  isAvailable        Boolean            @default(false) @map("is_available")
+  verificationStatus VerificationStatus @default(NONE) @map("verification_status")
+  credentialDocUrl   String?            @map("credential_doc_url")
+  lat                Float?
+  lng                Float?
+  lastSeenAt         DateTime?          @map("last_seen_at")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Matching filters on availability + freshness, then a lat/lng bounding box.
+  @@index([isAvailable, lastSeenAt])
+  @@index([lat, lng])
+  @@map("helper_profiles")
+}
+
+model SosRequest {
+  id           String    @id @default(uuid())
+  requesterId  String    @map("requester_id")
+  type         SosType
+  description  String?
+  photoUrl     String?   @map("photo_url")
+  lat          Float
+  lng          Float
+  accuracyM    Float?    @map("accuracy_m")
+  status       SosStatus @default(OPEN)
+  helperId     String?   @map("helper_id")
+  acceptedAt   DateTime? @map("accepted_at")
+  enRouteAt    DateTime? @map("en_route_at")
+  arrivedAt    DateTime? @map("arrived_at")
+  resolvedAt   DateTime? @map("resolved_at")
+  cancelledAt  DateTime? @map("cancelled_at")
+  cancelledBy  String?   @map("cancelled_by") // user id of whoever cancelled
+  cancelReason String?   @map("cancel_reason")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  requester       User              @relation("SosRequester", fields: [requesterId], references: [id])
+  helper          User?             @relation("SosHelper", fields: [helperId], references: [id])
+  cancelledByUser User?             @relation("SosCancelledBy", fields: [cancelledBy], references: [id])
+  notifications   SosNotification[]
+  locationUpdates LocationUpdate[]
+  messages        Message[]
+  ratings         Rating[]
+  reports         Report[]
+
+  @@index([status, createdAt])
+  @@index([requesterId, createdAt]) // "max 3 OPEN per day" check + history
+  @@index([helperId, createdAt])
+  @@map("sos_requests")
+}
+
+model SosNotification {
+  id        String               @id @default(uuid())
+  sosId     String               @map("sos_id")
+  helperId  String               @map("helper_id")
+  channel   NotificationChannel
+  round     Int // 1 | 2 | 3 — escalation round
+  sentAt    DateTime             @default(now()) @map("sent_at")
+  seenAt    DateTime?            @map("seen_at")
+  response  NotificationResponse @default(NONE)
+  createdAt DateTime             @default(now()) @map("created_at")
+  updatedAt DateTime             @updatedAt @map("updated_at")
+
+  sos    SosRequest @relation(fields: [sosId], references: [id], onDelete: Cascade)
+  helper User       @relation(fields: [helperId], references: [id])
+
+  // A helper is alerted at most once per channel per SOS, even across escalation rounds.
+  @@unique([sosId, helperId, channel])
+  @@index([helperId])
+  @@map("sos_notifications")
+}
+
+model LocationUpdate {
+  id         String   @id @default(uuid())
+  sosId      String   @map("sos_id")
+  userId     String   @map("user_id")
+  lat        Float
+  lng        Float
+  recordedAt DateTime @default(now()) @map("recorded_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  sos  SosRequest @relation(fields: [sosId], references: [id], onDelete: Cascade)
+  user User       @relation(fields: [userId], references: [id])
+
+  @@index([sosId, recordedAt])
+  @@index([recordedAt]) // 30-day retention cleanup
+  @@map("location_updates")
+}
+
+model Message {
+  id        String    @id @default(uuid())
+  sosId     String    @map("sos_id")
+  senderId  String    @map("sender_id")
+  body      String
+  sentAt    DateTime  @default(now()) @map("sent_at")
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  sos    SosRequest @relation(fields: [sosId], references: [id], onDelete: Cascade)
+  sender User       @relation(fields: [senderId], references: [id])
+
+  @@index([sosId, sentAt])
+  @@map("messages")
+}
+
+model Rating {
+  id         String   @id @default(uuid())
+  sosId      String   @map("sos_id")
+  fromUserId String   @map("from_user_id")
+  toUserId   String   @map("to_user_id")
+  stars      Int // 1–5, enforced by Zod
+  comment    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  sos      SosRequest @relation(fields: [sosId], references: [id], onDelete: Cascade)
+  fromUser User       @relation("RatingFrom", fields: [fromUserId], references: [id])
+  toUser   User       @relation("RatingTo", fields: [toUserId], references: [id])
+
+  @@unique([sosId, fromUserId])
+  @@index([toUserId])
+  @@map("ratings")
+}
+
+model Report {
+  id             String       @id @default(uuid())
+  reporterId     String       @map("reporter_id")
+  reportedUserId String       @map("reported_user_id")
+  sosId          String?      @map("sos_id")
+  reason         String
+  status         ReportStatus @default(OPEN)
+  adminNote      String?      @map("admin_note")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  reporter     User        @relation("ReportReporter", fields: [reporterId], references: [id])
+  reportedUser User        @relation("ReportReported", fields: [reportedUserId], references: [id])
+  sos          SosRequest? @relation(fields: [sosId], references: [id], onDelete: SetNull)
+
+  @@index([reportedUserId, status]) // "3 open reports => auto-suspend"
+  @@index([status, createdAt])
+  @@map("reports")
+}
+
+model AdminAction {
+  id           String   @id @default(uuid())
+  adminId      String   @map("admin_id")
+  action       String
+  targetUserId String?  @map("target_user_id")
+  note         String
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  admin      User  @relation("AdminActor", fields: [adminId], references: [id])
+  targetUser User? @relation("AdminTarget", fields: [targetUserId], references: [id])
+
+  @@index([targetUserId])
+  @@map("admin_actions")
 }
