@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# env files (keep the examples)
+.env
+.env.*
+!.env.example
+
+# build / test output
+dist/
+coverage/
+playwright-report/
+test-results/
+
+# logs
+*.log
+npm-debug.log*
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
