@@ -10,6 +10,8 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   DATABASE_URL: z.string().min(1),
   CLIENT_ORIGIN: z.url().default('http://localhost:5173'),
+  JWT_ACCESS_SECRET: z.string().min(32, 'must be at least 32 characters'),
+  JWT_REFRESH_SECRET: z.string().min(32, 'must be at least 32 characters'),
 });
 
 const parsed = envSchema.safeParse(process.env);

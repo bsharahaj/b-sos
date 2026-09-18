@@ -3,6 +3,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import { env } from './config/env.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
+import { authRouter } from './routes/auth.js';
 
 export function createApp() {
   const app = express();
@@ -14,6 +15,8 @@ export function createApp() {
   app.get('/health', (req, res) => {
     res.json({ status: 'ok', uptime: process.uptime() });
   });
+
+  app.use('/auth', authRouter);
 
   app.use(notFound);
   app.use(errorHandler);

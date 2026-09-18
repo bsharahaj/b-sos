@@ -92,8 +92,24 @@ model User {
   reportsAgainst    Report[]          @relation("ReportReported")
   adminActionsTaken AdminAction[]     @relation("AdminActor")
   adminActionsOn    AdminAction[]     @relation("AdminTarget")
+  refreshSessions   RefreshSession[]
 
   @@map("users")
+}
+
+// One row per issued refresh token (its JWT `jti`). Rotated on every /auth/refresh, revoked on logout.
+model RefreshSession {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_sessions")
 }
 
 model HelperProfile {
