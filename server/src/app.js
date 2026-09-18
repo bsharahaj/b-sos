@@ -4,6 +4,7 @@ import cors from 'cors';
 import { env } from './config/env.js';
 import { errorHandler, notFound } from './middleware/errorHandler.js';
 import { authRouter } from './routes/auth.js';
+import { meRouter } from './routes/me.js';
 
 export function createApp() {
   const app = express();
@@ -17,6 +18,7 @@ export function createApp() {
   });
 
   app.use('/auth', authRouter);
+  app.use('/me', meRouter);
 
   app.use(notFound);
   app.use(errorHandler);

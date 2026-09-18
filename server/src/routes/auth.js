@@ -4,6 +4,7 @@ import { env } from '../config/env.js';
 import { validate } from '../middleware/validate.js';
 import { readCookie } from '../utils/cookies.js';
 import { REFRESH_TOKEN_TTL_SEC } from '../utils/tokens.js';
+import { phoneSchema } from '../utils/validation.js';
 import * as authService from '../services/auth.js';
 
 // ---------- Schemas ----------
@@ -15,11 +16,7 @@ const registerSchema = z.object({
   // bcrypt only uses the first 72 bytes, so cap the length instead of silently truncating.
   password: z.string().min(8, 'Password must be at least 8 characters.').max(72),
   name: z.string().trim().min(2).max(80),
-  phone: z
-    .string()
-    .trim()
-    .regex(/^\+[1-9]\d{7,14}$/, 'Use international format, e.g. +972501234567.')
-    .optional(),
+  phone: phoneSchema.optional(),
 });
 
 const loginSchema = z.object({

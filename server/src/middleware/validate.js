@@ -12,7 +12,10 @@ export function validate(schemas) {
 
       const result = schemas[part].safeParse(req[part] ?? {});
       if (!result.success) {
-        throw new HttpError(400, 'VALIDATION_ERROR', 'Some fields are invalid.', z.flattenError(result.error).fieldErrors);
+        // Object-level problems (unknown keys, .refine on the whole object) land in formErrors, reported as `_form`.
+        const { formErrors, fieldErrors } = z.flattenError(result.error);
+        const details = formErrors.length ? { ...fieldErrors, _form: formErrors } : fieldErrors;
+        throw new HttpError(400, 'VALIDATION_ERROR', 'Some fields are invalid.', details);
       }
       req.validated[part] = result.data;
     }
