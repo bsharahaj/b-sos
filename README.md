@@ -18,7 +18,7 @@ docs/     plan, API notes, decisions
 ## Requirements
 
 - Node.js **20.19+** (`node -v`)
-- PostgreSQL 16 — not needed yet; required once the first Prisma models land
+- PostgreSQL 18 — a dev database (`DATABASE_URL`) and a separate test database (`TEST_DATABASE_URL`, e.g. local `bsos_test`)
 - Redis — not needed yet
 
 ## Server

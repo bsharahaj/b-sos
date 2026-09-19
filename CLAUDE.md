@@ -16,7 +16,7 @@ Roles: Requester, Helper (any user can be one), Verified professional (credentia
 |---|---|
 | Client | React 18 + Vite, React Router, Tailwind CSS, Leaflet + react-leaflet, socket.io-client, axios |
 | Server | Node 20, Express, Socket.io, Prisma ORM, Zod, bcrypt, jsonwebtoken, pino, helmet, cors, express-rate-limit |
-| Database | PostgreSQL 16 (PostGIS enabled later for geo queries) |
+| Database | PostgreSQL 18 (PostGIS enabled later for geo queries) |
 | Cache / live data | Redis (ioredis) — online helpers, live positions, rate limits; BullMQ for scheduled jobs |
 | Files | Cloudinary (photos, credential documents) |
 | Push | Firebase Cloud Messaging (web push) — Tier 3 |
