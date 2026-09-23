@@ -79,22 +79,41 @@ model User {
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")
 
-  helperProfile     HelperProfile?
-  sosRequested      SosRequest[]      @relation("SosRequester")
-  sosHelped         SosRequest[]      @relation("SosHelper")
-  sosCancelled      SosRequest[]      @relation("SosCancelledBy")
-  notifications     SosNotification[]
-  locationUpdates   LocationUpdate[]
-  messagesSent      Message[]
-  ratingsGiven      Rating[]          @relation("RatingFrom")
-  ratingsReceived   Rating[]          @relation("RatingTo")
-  reportsFiled      Report[]          @relation("ReportReporter")
-  reportsAgainst    Report[]          @relation("ReportReported")
-  adminActionsTaken AdminAction[]     @relation("AdminActor")
-  adminActionsOn    AdminAction[]     @relation("AdminTarget")
-  refreshSessions   RefreshSession[]
+  helperProfile      HelperProfile?
+  sosRequested       SosRequest[]        @relation("SosRequester")
+  sosHelped          SosRequest[]        @relation("SosHelper")
+  sosCancelled       SosRequest[]        @relation("SosCancelledBy")
+  notifications      SosNotification[]
+  locationUpdates    LocationUpdate[]
+  messagesSent       Message[]
+  ratingsGiven       Rating[]            @relation("RatingFrom")
+  ratingsReceived    Rating[]            @relation("RatingTo")
+  reportsFiled       Report[]            @relation("ReportReporter")
+  reportsAgainst     Report[]            @relation("ReportReported")
+  adminActionsTaken  AdminAction[]       @relation("AdminActor")
+  adminActionsOn     AdminAction[]       @relation("AdminTarget")
+  refreshSessions    RefreshSession[]
+  phoneVerifications PhoneVerification[]
 
   @@map("users")
+}
+
+// One row per SMS code sent. The code itself is never stored, only an HMAC of it.
+model PhoneVerification {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  phone      String
+  codeHash   String    @map("code_hash")
+  expiresAt  DateTime  @map("expires_at")
+  attempts   Int       @default(0)
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt]) // resend cooldown + hourly cap
+  @@map("phone_verifications")
 }
 
 // One row per issued refresh token (its JWT `jti`). Rotated on every /auth/refresh, revoked on logout.

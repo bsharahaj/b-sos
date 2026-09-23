@@ -2,10 +2,12 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { env } from '../config/env.js';
 import { validate } from '../middleware/validate.js';
+import { requireAuth } from '../middleware/requireAuth.js';
 import { readCookie } from '../utils/cookies.js';
 import { REFRESH_TOKEN_TTL_SEC } from '../utils/tokens.js';
 import { phoneSchema } from '../utils/validation.js';
 import * as authService from '../services/auth.js';
+import * as phoneVerification from '../services/phoneVerification.js';
 
 // ---------- Schemas ----------
 
@@ -22,6 +24,13 @@ const registerSchema = z.object({
 const loginSchema = z.object({
   email,
   password: z.string().min(1).max(72),
+});
+
+const sendCodeSchema = z.object({ phone: phoneSchema });
+
+const verifyCodeSchema = z.object({
+  phone: phoneSchema,
+  code: z.string().trim().regex(/^\d{6}$/, 'The code is 6 digits.'),
 });
 
 // ---------- Refresh cookie ----------
@@ -68,4 +77,13 @@ authRouter.post('/logout', async (req, res) => {
   await authService.logout(readCookie(req, REFRESH_COOKIE));
   res.clearCookie(REFRESH_COOKIE, refreshCookieOptions);
   res.status(204).end();
+});
+
+// Phone verification needs a logged-in user: the verified number is attached to that account.
+authRouter.post('/phone/send-code', requireAuth, validate({ body: sendCodeSchema }), async (req, res) => {
+  res.json(await phoneVerification.sendCode(req.user.id, req.body.phone));
+});
+
+authRouter.post('/phone/verify', requireAuth, validate({ body: verifyCodeSchema }), async (req, res) => {
+  res.json(await phoneVerification.verifyCode(req.user.id, req.body.phone, req.body.code));
 });

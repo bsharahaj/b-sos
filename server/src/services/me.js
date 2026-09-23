@@ -3,7 +3,7 @@ import { HttpError } from '../utils/httpError.js';
 import { PUBLIC_USER_SELECT } from './auth.js';
 
 // The owner may see a few more of their own fields than other users would.
-const ME_SELECT = {
+export const ME_SELECT = {
   ...PUBLIC_USER_SELECT,
   trustedContactPhone: true,
   isSuspended: true,
