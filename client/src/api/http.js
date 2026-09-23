@@ -20,6 +20,54 @@ http.interceptors.request.use((config) => {
   return config;
 });
 
+// ---------- Refresh ----------
+// The server rotates the refresh cookie on every use and treats a reused (already-rotated) cookie as
+// theft, revoking every session. So all callers must share ONE in-flight refresh request.
+
+let refreshPromise = null;
+let onSessionExpired = () => {};
+
+// AuthProvider registers this so a failed refresh mid-session signs the user out of the UI.
+export function setSessionExpiredHandler(handler) {
+  onSessionExpired = handler;
+}
+
+// Resolves to { user, accessToken } and stores the new token, or throws toApiError's shape.
+export function refreshSession() {
+  if (!refreshPromise) {
+    refreshPromise = http
+      .post('/auth/refresh', null, { skipAuthRefresh: true })
+      .then(({ data }) => {
+        setAccessToken(data.accessToken);
+        return data;
+      })
+      .catch((err) => {
+        setAccessToken(null);
+        throw toApiError(err);
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+}
+
+// Access tokens last 15 min. When one expires, refresh once and replay the original request.
+http.interceptors.response.use(undefined, async (err) => {
+  const { config, response } = err;
+  const expired = response?.status === 401 && response.data?.error?.code === 'TOKEN_EXPIRED';
+  if (!expired || !config || config.skipAuthRefresh || config._retried) throw err;
+
+  try {
+    await refreshSession();
+  } catch {
+    onSessionExpired();
+    throw err;
+  }
+  config._retried = true;
+  return http(config);
+});
+
 // Turns any axios failure into { code, message, fieldErrors } with a plain-language message.
 // fieldErrors maps a field name to its first message, from the server's VALIDATION_ERROR details.
 export function toApiError(err) {

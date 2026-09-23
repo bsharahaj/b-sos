@@ -1,11 +1,15 @@
 import { SOS_TYPES } from '@shared/constants.js';
+import { useAuth } from '../hooks/useAuth.js';
+import Button from '../components/Button.jsx';
 
 // Placeholder until the Home feature is built; the list proves /shared is wired into the client.
 export default function Home() {
+  const { user, logout } = useAuth();
+
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 p-4">
       <h1 className="text-3xl font-bold text-red-600">B SOS</h1>
-      <p className="text-gray-700">Community emergency response. Scaffold is running.</p>
+      <p className="text-gray-700">Signed in as {user.name}. Scaffold is running.</p>
       <section aria-labelledby="types-heading">
         <h2 id="types-heading" className="font-semibold">SOS types</h2>
         <ul className="list-inside list-disc text-gray-700">
@@ -14,6 +18,9 @@ export default function Home() {
           ))}
         </ul>
       </section>
+      <Button variant="secondary" onClick={logout}>
+        Log out
+      </Button>
     </main>
   );
 }

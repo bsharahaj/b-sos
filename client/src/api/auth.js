@@ -1,4 +1,4 @@
-import { http, toApiError } from './http.js';
+import { http, refreshSession, setAccessToken, toApiError } from './http.js';
 
 // Each call resolves to { user, accessToken } or throws the shape returned by toApiError.
 
@@ -19,5 +19,19 @@ export async function register({ name, email, password, phone }) {
     return data;
   } catch (err) {
     throw toApiError(err);
+  }
+}
+
+// Uses the refresh cookie to get a fresh session, e.g. after a page reload.
+export const restoreSession = refreshSession;
+
+// Always clears the local token, even if the request fails (e.g. offline): the user asked to leave.
+export async function logout() {
+  try {
+    await http.post('/auth/logout', null, { skipAuthRefresh: true });
+  } catch {
+    // The server-side session will expire on its own; nothing useful to tell the user.
+  } finally {
+    setAccessToken(null);
   }
 }
