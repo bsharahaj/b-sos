@@ -68,17 +68,19 @@ http.interceptors.response.use(undefined, async (err) => {
   return http(config);
 });
 
-// Turns any axios failure into { code, message, fieldErrors } with a plain-language message.
+// Turns any axios failure into { code, message, fieldErrors, details } with a plain-language message.
 // fieldErrors maps a field name to its first message, from the server's VALIDATION_ERROR details.
+// details is the server's raw details object (e.g. { attemptsLeft } or { retryAfterSec }).
 export function toApiError(err) {
   const body = err?.response?.data?.error;
 
   if (body) {
+    const details = body.details ?? {};
     const fieldErrors = {};
-    for (const [field, messages] of Object.entries(body.details ?? {})) {
+    for (const [field, messages] of Object.entries(details)) {
       if (Array.isArray(messages) && messages.length) fieldErrors[field] = messages[0];
     }
-    return { code: body.code, message: body.message, fieldErrors };
+    return { code: body.code, message: body.message, fieldErrors, details };
   }
 
   if (err?.code === 'ECONNABORTED') {

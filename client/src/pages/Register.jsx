@@ -7,10 +7,10 @@ import TextField from '../components/TextField.jsx';
 import PasswordField from '../components/PasswordField.jsx';
 import Button from '../components/Button.jsx';
 import FormAlert from '../components/FormAlert.jsx';
+import PhoneField, { PHONE_FORMAT_MESSAGE, isValidPhone, normalisePhone } from '../components/PhoneField.jsx';
 
 // Mirrors the server's Zod rules (server/src/routes/auth.js) so most mistakes are caught before a round trip.
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
 
 // Field order = focus order when several are invalid.
 const FIELDS = ['name', 'email', 'phone', 'password'];
@@ -24,19 +24,12 @@ function validate({ name, email, phone, password }) {
   if (!email.trim()) errors.email = 'Enter your email address.';
   else if (!EMAIL_PATTERN.test(email.trim())) errors.email = 'Enter a valid email address.';
 
-  if (phone.trim() && !PHONE_PATTERN.test(normalisePhone(phone))) {
-    errors.phone = 'Use international format, e.g. +972501234567.';
-  }
+  if (phone.trim() && !isValidPhone(phone)) errors.phone = PHONE_FORMAT_MESSAGE;
 
   if (password.length < 8) errors.password = 'Use at least 8 characters.';
   else if (new TextEncoder().encode(password).length > 72) errors.password = 'That password is too long (72 characters max).';
 
   return errors;
-}
-
-// People type spaces and dashes in phone numbers; the server wants plain +digits.
-function normalisePhone(phone) {
-  return phone.replace(/[\s()-]/g, '');
 }
 
 export default function Register() {
@@ -78,11 +71,12 @@ export default function Register() {
       const session = await register({
         name: values.name.trim(),
         email: values.email.trim(),
-        phone: normalisePhone(values.phone.trim()),
+        phone: normalisePhone(values.phone),
         password: values.password,
       });
       startSession(session);
-      navigate('/', { replace: true });
+      // Phone verification is required before sending an SOS, so offer it straight away.
+      navigate('/verify-phone', { replace: true });
     } catch (err) {
       setSubmitting(false);
       // "Email/phone already used" belongs next to that field, not in the top banner.
@@ -132,14 +126,10 @@ export default function Register() {
           error={fieldErrors.email}
         />
 
-        <TextField
+        <PhoneField
           ref={refs.phone}
           label="Phone number (optional)"
           name="phone"
-          type="tel"
-          inputMode="tel"
-          autoComplete="tel"
-          placeholder="+972501234567"
           hint="You'll need to verify a phone number before you can send an SOS."
           value={values.phone}
           onChange={onChange}

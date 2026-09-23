@@ -22,6 +22,26 @@ export async function register({ name, email, password, phone }) {
   }
 }
 
+// Texts a 6-digit code. Resolves to { sentTo, expiresInSec, resendAfterSec }.
+export async function sendPhoneCode(phone) {
+  try {
+    const { data } = await http.post('/auth/phone/send-code', { phone });
+    return data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}
+
+// Resolves to { user } with phoneVerified: true.
+export async function verifyPhoneCode(phone, code) {
+  try {
+    const { data } = await http.post('/auth/phone/verify', { phone, code });
+    return data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}
+
 // Uses the refresh cookie to get a fresh session, e.g. after a page reload.
 export const restoreSession = refreshSession;
 

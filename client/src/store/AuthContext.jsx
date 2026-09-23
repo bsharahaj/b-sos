@@ -50,7 +50,13 @@ export function AuthProvider({ children }) {
     return () => setSessionExpiredHandler(() => {});
   }, [endSession]);
 
-  const value = useMemo(() => ({ user, status, startSession, logout }), [user, status, startSession, logout]);
+  // For endpoints that return an updated user (e.g. phone verification) without a new session.
+  const updateUser = useCallback((nextUser) => setUser(nextUser), []);
+
+  const value = useMemo(
+    () => ({ user, status, startSession, updateUser, logout }),
+    [user, status, startSession, updateUser, logout],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

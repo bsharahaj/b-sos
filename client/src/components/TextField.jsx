@@ -2,7 +2,11 @@ import { forwardRef, useId } from 'react';
 
 // Label above, hint below, error replaces the hint. `trailing` renders inside the input's end edge
 // (end = right in LTR, left in RTL), e.g. the show/hide password button.
-const TextField = forwardRef(function TextField({ label, hint, error, trailing, id, className = '', ...inputProps }, ref) {
+// className styles the wrapper; inputClassName adds classes to the <input> itself.
+const TextField = forwardRef(function TextField(
+  { label, hint, error, trailing, id, className = '', inputClassName = '', ...inputProps },
+  ref,
+) {
   const autoId = useId();
   const inputId = id ?? autoId;
   const hintId = `${inputId}-hint`;
@@ -24,7 +28,7 @@ const TextField = forwardRef(function TextField({ label, hint, error, trailing, 
           // text-base (16px) stops iOS Safari zooming in on focus.
           className={`min-h-12 w-full rounded-xl border bg-surface px-4 text-base text-ink placeholder:text-ink-muted/70 transition-colors focus:outline-3 focus:outline-offset-0 ${
             error ? 'border-error focus:outline-error/25' : 'border-line-strong focus:border-primary focus:outline-primary/25'
-          } ${trailing ? 'pe-12' : ''}`}
+          } ${trailing ? 'pe-12' : ''} ${inputClassName}`}
           {...inputProps}
         />
         {trailing && <div className="absolute inset-y-0 end-0 flex items-center pe-1">{trailing}</div>}
