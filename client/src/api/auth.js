@@ -1,0 +1,23 @@
+import { http, toApiError } from './http.js';
+
+// Each call resolves to { user, accessToken } or throws the shape returned by toApiError.
+
+export async function login({ email, password }) {
+  try {
+    const { data } = await http.post('/auth/login', { email, password });
+    return data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}
+
+export async function register({ name, email, password, phone }) {
+  // The server rejects an empty string for phone, so only send it when filled in.
+  const body = { name, email, password, ...(phone && { phone }) };
+  try {
+    const { data } = await http.post('/auth/register', body);
+    return data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}
