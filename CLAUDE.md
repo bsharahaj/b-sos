@@ -148,7 +148,8 @@ Rule: never `io.emit` to everyone. Always emit to a specific room.
 - When adding an endpoint, add: Zod schema, route, service, Supertest test, and a line in `docs/API.md`.
 - When adding a socket event, update the table in section 7 of this file.
 - When a schema changes: edit `schema.prisma`, run `npx prisma migrate dev --name <short-name>`, regenerate, and mention it.
-- Ask before: adding a dependency, changing the folder layout, changing an enum, or anything that affects the other developer's work.
+- Ask before: adding a dependency, changing the folder layout, or changing an enum.
+- Git (solo workflow): one branch per feature (`feat/<name>`) from an up-to-date `main` → build → test → commit → merge into `main` → push. No pull-request review step. Confirm with the developer before pushing to GitHub.
 - Explain briefly *why* when introducing a pattern the developers may not know (transactions, rooms, refresh tokens).
 
 ## 11. Commands
@@ -174,6 +175,6 @@ Client (`client/.env.example`): `VITE_API_URL, VITE_SOCKET_URL, VITE_FIREBASE_*`
 
 - Works on a phone over mobile data, not only localhost.
 - Has at least one automated test.
-- Reviewed in a pull request by the other developer.
+- Merged into `main` only after it was run and checked (tests pass, client checked at 375 px).
 - Errors are handled and shown to the user in plain language.
 - Section 6/7 of this file and `docs/API.md` are updated if the contract changed.
