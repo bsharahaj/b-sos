@@ -1,1 +1,40 @@
 @import 'tailwindcss';
+
+/* Option A "Calm Clarity" tokens. Use these names (bg-surface, text-ink, bg-primary…) instead of raw hex.
+   Red (sos) is reserved for the SOS action only; warnings use amber. */
+@theme {
+  --font-sans: 'IBM Plex Sans Arabic', ui-sans-serif, system-ui, sans-serif;
+
+  --color-canvas: #f8fafc;
+  --color-surface: #ffffff;
+  --color-ink: #0f172a;
+  --color-ink-muted: #475569;
+  --color-line: #e2e8f0;
+  --color-line-strong: #94a3b8;
+
+  --color-primary: #0369a1;
+  --color-primary-hover: #075985;
+  --color-primary-soft: #e0f2fe;
+
+  --color-sos: #dc2626;
+  --color-sos-hover: #b91c1c;
+
+  --color-warning: #b45309;
+  --color-warning-soft: #fffbeb;
+  --color-success: #15803d;
+  --color-success-soft: #f0fdf4;
+  --color-error: #b91c1c;
+  --color-error-soft: #fef2f2;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+    /* Arabic needs more vertical room than Latin; 1.6 suits both. */
+    line-height: 1.6;
+  }
+}
