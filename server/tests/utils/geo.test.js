@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { coarsen, COARSE_RADIUS_M } from '../../src/utils/geo.js';
+import { boundingBox, coarsen, COARSE_RADIUS_M, haversineM } from '../../src/utils/geo.js';
 
 // Rough metres between two nearby points (equirectangular approximation, fine at this scale).
 function metresBetween(a, b) {
@@ -25,5 +25,32 @@ describe('coarsen', () => {
       const worst = { lat: lat + 0.00499, lng: 34.00499 }; // near a cell corner
       expect(metresBetween(worst, coarsen(worst.lat, worst.lng))).toBeLessThan(COARSE_RADIUS_M);
     }
+  });
+});
+
+describe('haversineM', () => {
+  it('is 0 for the same point', () => {
+    expect(haversineM({ lat: 32.08, lng: 34.78 }, { lat: 32.08, lng: 34.78 })).toBe(0);
+  });
+
+  it('matches known distances', () => {
+    // 1° of latitude ≈ 111.2 km
+    expect(haversineM({ lat: 0, lng: 0 }, { lat: 1, lng: 0 })).toBeCloseTo(111_195, -1);
+    // Tel Aviv -> Jerusalem ≈ 54 km
+    const d = haversineM({ lat: 32.0853, lng: 34.7818 }, { lat: 31.7683, lng: 35.2137 });
+    expect(d).toBeGreaterThan(53_000);
+    expect(d).toBeLessThan(55_000);
+  });
+});
+
+describe('boundingBox', () => {
+  it('contains every point on the radius circle', () => {
+    const centre = { lat: 32.08, lng: 34.78 };
+    const box = boundingBox(centre.lat, centre.lng, 3000);
+    // Points ~3 km north/south/east/west must be inside the box.
+    expect(centre.lat + 0.0269).toBeLessThan(box.maxLat);
+    expect(centre.lat - 0.0269).toBeGreaterThan(box.minLat);
+    const east = { lat: centre.lat, lng: box.maxLng };
+    expect(haversineM(centre, east)).toBeCloseTo(3000, -1);
   });
 });
