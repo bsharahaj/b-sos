@@ -33,6 +33,12 @@ export default function Home() {
           ))}
         </ul>
       </section>
+      <Link
+        to="/profile"
+        className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-5 text-base font-semibold text-white hover:bg-primary-hover focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      >
+        Your profile & helper settings
+      </Link>
       <Button variant="secondary" onClick={logout}>
         Log out
       </Button>
