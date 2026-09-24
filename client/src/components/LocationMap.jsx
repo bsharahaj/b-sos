@@ -34,6 +34,38 @@ function FollowPin({ pin, follow }) {
   return null;
 }
 
+// The helper on the requester's map: a teal disc with a dark ring, clearly different from the SOS pin.
+const helperIcon = L.divIcon({
+  className: '',
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+  html: `<span style="display:block;width:28px;height:28px;border-radius:50%;background:#2dd4bf;border:4px solid #0b1220;box-shadow:0 0 0 3px rgba(45,212,191,.35)"></span>`,
+});
+
+// When the helper first appears (or the pair changes), zoom out so both points are visible; afterwards
+// the helper marker just moves, so the map doesn't jump every few seconds.
+function FitPair({ pin, helperPin }) {
+  const map = useMap();
+  const key = pin && helperPin ? `${pin.lat},${pin.lng}` : null;
+  useEffect(() => {
+    if (!pin || !helperPin) return;
+    map.fitBounds([[pin.lat, pin.lng], [helperPin.lat, helperPin.lng]], { padding: [48, 48], maxZoom: 17 });
+    // Only when the helper appears or the SOS point changes; helper movement alone must not re-fit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, key, Boolean(helperPin)]);
+  return null;
+}
+
+// Approximate ground distance between two points in metres.
+export function metresBetween(a, b) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(b.lat - a.lat);
+  const dLng = toRad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
 function Pin({ pin, draggable, onMove }) {
   const map = useMap();
   const eventHandlers = useMemo(
@@ -68,7 +100,8 @@ function TapToPlace({ onPlace }) {
 // pin: { lat, lng } | null. accuracy (metres) draws the uncertainty circle; pass null to hide it.
 // onPinChange(latlng, zoom) fires when the user drags the pin or taps the map.
 // `interactive={false}` gives a read-only map (e.g. on the active-SOS screen).
-export default function LocationMap({ pin, accuracy = null, followPin = true, onPinChange, interactive = true, className = '' }) {
+// helperPin: { lat, lng } | null — the assigned helper's live position (requester's view).
+export default function LocationMap({ pin, accuracy = null, helperPin = null, followPin = true, onPinChange, interactive = true, className = '' }) {
   return (
     <MapContainer
       center={pin ? [pin.lat, pin.lng] : FALLBACK_CENTER}
@@ -96,7 +129,9 @@ export default function LocationMap({ pin, accuracy = null, followPin = true, on
         />
       )}
       {pin && <Pin pin={pin} draggable={interactive} onMove={onPinChange} />}
-      <FollowPin pin={pin} follow={followPin} />
+      {helperPin && <Marker position={[helperPin.lat, helperPin.lng]} icon={helperIcon} keyboard={false} title="Your helper" />}
+      <FollowPin pin={pin} follow={followPin && !helperPin} />
+      <FitPair pin={pin} helperPin={helperPin} />
       {interactive && onPinChange && <TapToPlace onPlace={onPinChange} />}
     </MapContainer>
   );

@@ -29,6 +29,19 @@ export async function declineSos(id) {
   }
 }
 
+// Progress steps. Each resolves to { sos } with the new status.
+const progress = (path) => async (id) => {
+  try {
+    const { data } = await http.post(`/sos/${id}/${path}`);
+    return data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+};
+export const markEnRoute = progress('en-route');
+export const markArrived = progress('arrived');
+export const resolveSos = progress('resolve');
+
 // reason is optional. Resolves to { sos } with status CANCELLED.
 export async function cancelSos(id, reason) {
   try {

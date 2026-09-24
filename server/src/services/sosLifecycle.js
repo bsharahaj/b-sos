@@ -134,6 +134,58 @@ export async function declineSos(sosId, helperId) {
   }
 }
 
+// ---------- Progress: EN_ROUTE -> ARRIVED -> RESOLVED ----------
+
+// The assigned helper reports progress; either party may mark it resolved once the helper has arrived.
+const HELPER_ONLY = [STATUSES.EN_ROUTE, STATUSES.ARRIVED];
+const TIMESTAMP_FIELD = { [STATUSES.EN_ROUTE]: 'enRouteAt', [STATUSES.ARRIVED]: 'arrivedAt', [STATUSES.RESOLVED]: 'resolvedAt' };
+
+export async function progressSos(sosId, userId, to) {
+  const sos = await prisma.sosRequest.findUnique({
+    where: { id: sosId },
+    select: { id: true, status: true, requesterId: true, helperId: true },
+  });
+  if (!sos) throw notFound();
+
+  const isRequester = sos.requesterId === userId;
+  const isHelper = sos.helperId === userId;
+  if (!isRequester && !isHelper) throw new HttpError(403, 'NOT_YOUR_SOS', 'Only the requester or the assigned helper can update this SOS.');
+  if (HELPER_ONLY.includes(to) && !isHelper) throw new HttpError(403, 'HELPER_ONLY', 'Only the helper can report this step.');
+
+  if (!canTransition(sos.status, to)) {
+    throw new HttpError(409, 'INVALID_TRANSITION', progressMessage(sos.status, to), { from: sos.status, to });
+  }
+
+  // Conditional update guards against a concurrent change (e.g. a cancel racing this step).
+  const at = new Date();
+  const { count } = await prisma.sosRequest.updateMany({
+    where: { id: sosId, status: sos.status },
+    data: { status: to, [TIMESTAMP_FIELD[to]]: at },
+  });
+  if (count === 0) throw new HttpError(409, 'INVALID_TRANSITION', 'This SOS just changed. Please check its status.', { from: sos.status, to });
+
+  if (to === STATUSES.RESOLVED) await recordFinalPosition(sosId, sos.helperId, at);
+
+  emitToSos(sosId, 'sos:status', { sosId, status: to, at });
+  logger.info({ sosId, userId, from: sos.status, to }, 'SOS progressed');
+  return { status: to, at };
+}
+
+function progressMessage(from, to) {
+  if (from === STATUSES.RESOLVED || from === STATUSES.CANCELLED) return 'This SOS is already closed.';
+  if (to === STATUSES.RESOLVED) return 'Mark the SOS as resolved once the helper has arrived.';
+  if (from === STATUSES.OPEN) return 'No helper has accepted this SOS yet.';
+  return `You can't go from ${from.toLowerCase().replace('_', ' ')} to ${to.toLowerCase().replace('_', ' ')}.`;
+}
+
+// Live pings never touch Postgres; on resolve, one final sample of the helper's position is kept
+// (CLAUDE.md §4 "Live positions"), which is what history and disputes need.
+async function recordFinalPosition(sosId, helperId, recordedAt) {
+  const pos = helperId ? positions.get(helperId) : null;
+  if (!pos) return;
+  await prisma.locationUpdate.create({ data: { sosId, userId: helperId, lat: pos.lat, lng: pos.lng, recordedAt } });
+}
+
 // ---------- Cancel ----------
 
 export async function cancelSos(sosId, userId, reason) {

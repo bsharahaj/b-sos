@@ -8,8 +8,9 @@ const SEND_EVERY_MS = 4000;
 // (`helper:location`, every ~4 s) so matching can find them and, later, requesters can watch them approach.
 // Renders nothing. Mounted once inside the signed-in area of the app.
 export default function HelperPresence() {
-  const { helperProfile } = useAuth();
-  const available = Boolean(helperProfile?.isAvailable);
+  const { helperProfile, helpingSosId } = useAuth();
+  // Stream while available, and always while actively helping someone (the requester is watching the map).
+  const available = Boolean(helperProfile?.isAvailable) || Boolean(helpingSosId);
 
   useEffect(() => {
     if (!available || !('geolocation' in navigator)) return undefined;

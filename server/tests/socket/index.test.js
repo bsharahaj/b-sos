@@ -120,3 +120,48 @@ describe('helper:location', () => {
     expect(positions.get(user.id)).toBeNull();
   });
 });
+
+describe('sos:helper-location forwarding', () => {
+  it("forwards an assigned helper's pings to the SOS room and nowhere else", async () => {
+    const requester = await createUser({ phone: '+972501000001', phoneVerified: true });
+    const helper = await createUser({ phone: '+972501000002' });
+    const bystander = await createUser({ phone: '+972501000003' });
+    const sos = await prisma.sosRequest.create({
+      data: { requesterId: requester.user.id, helperId: helper.user.id, type: 'VEHICLE', lat: 32.08, lng: 34.78, accuracyM: 10, status: 'ACCEPTED' },
+    });
+
+    const { socket: requesterSocket } = await openSocket(requester.token); // joins the sos room on connect (ACCEPTED SOS)
+    const { socket: bystanderSocket } = await openSocket(bystander.token);
+    const { socket: helperSocket } = await openSocket(helper.token);
+    await new Promise((resolve) => setTimeout(resolve, 100)); // room joins are async after connect
+
+    const received = [];
+    requesterSocket.on('sos:helper-location', (e) => received.push(e));
+    const leaked = [];
+    bystanderSocket.on('sos:helper-location', (e) => leaked.push(e));
+
+    await emitLocation(helperSocket, { lat: 32.081, lng: 34.781, accuracy: 9 });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(received).toHaveLength(1);
+    expect(received[0]).toMatchObject({ sosId: sos.id, lat: 32.081, lng: 34.781 });
+    expect(leaked).toEqual([]);
+  });
+
+  it('does not forward when the helper has no active SOS', async () => {
+    const requester = await createUser({ phone: '+972501000004', phoneVerified: true });
+    const helper = await createUser({ phone: '+972501000005' });
+    await prisma.sosRequest.create({
+      data: { requesterId: requester.user.id, helperId: helper.user.id, type: 'VEHICLE', lat: 32.08, lng: 34.78, accuracyM: 10, status: 'RESOLVED' },
+    });
+    const { socket: requesterSocket } = await openSocket(requester.token);
+    const { socket: helperSocket } = await openSocket(helper.token);
+    const received = [];
+    requesterSocket.on('sos:helper-location', (e) => received.push(e));
+
+    await emitLocation(helperSocket, { lat: 32.081, lng: 34.781 });
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(received).toEqual([]);
+  });
+});

@@ -541,3 +541,103 @@ describe('POST /sos/:id/accept and /decline', () => {
     );
   });
 });
+
+describe('POST /sos/:id/en-route, /arrived, /resolve', () => {
+  const step = (id, path, auth) => request(app).post(`/sos/${id}/${path}`).set('Authorization', auth).send();
+
+  let emitted;
+  beforeEach(async () => {
+    emitted = [];
+    const { setIo } = await import('../../src/socket/emitter.js');
+    setIo({
+      to: (room) => ({ emit: (event, payload) => emitted.push({ room, event, payload }) }),
+      in: () => ({ socketsJoin: () => {} }),
+    });
+  });
+
+  // An SOS already accepted by `helper`.
+  async function acceptedSos() {
+    const helper = await otherUser({ phone: '+972506000009' });
+    await prisma.helperProfile.create({
+      data: { userId: helper.user.id, skills: ['GENERAL'], isAvailable: true, lat: validSos.lat + 0.0018, lng: validSos.lng, lastSeenAt: new Date() },
+    });
+    const { body: created } = await postSos();
+    expect((await request(app).post(`/sos/${created.sos.id}/accept`).set('Authorization', helper.auth).send()).status).toBe(200);
+    emitted = [];
+    return { id: created.sos.id, helper };
+  }
+
+  it('walks ACCEPTED -> EN_ROUTE -> ARRIVED -> RESOLVED with timestamps and status events', async () => {
+    const { id, helper } = await acceptedSos();
+
+    expect((await step(id, 'en-route', helper.auth)).body.sos.status).toBe('EN_ROUTE');
+    expect((await step(id, 'arrived', helper.auth)).body.sos.status).toBe('ARRIVED');
+    const done = await step(id, 'resolve', helper.auth);
+    expect(done.status).toBe(200);
+    expect(done.body.sos.status).toBe('RESOLVED');
+
+    const stored = await prisma.sosRequest.findUnique({ where: { id } });
+    expect(stored.enRouteAt).toBeTruthy();
+    expect(stored.arrivedAt).toBeTruthy();
+    expect(stored.resolvedAt).toBeTruthy();
+    expect(emitted.map((e) => e.payload.status)).toEqual(['EN_ROUTE', 'ARRIVED', 'RESOLVED']);
+    expect(emitted.every((e) => e.room === `sos:${id}` && e.event === 'sos:status')).toBe(true);
+  });
+
+  it('lets the requester resolve once the helper has arrived, but not before', async () => {
+    const { id, helper } = await acceptedSos();
+
+    const early = await step(id, 'resolve', requesterAuth);
+    expect(early.status).toBe(409);
+    expect(early.body.error.code).toBe('INVALID_TRANSITION');
+
+    await step(id, 'en-route', helper.auth);
+    await step(id, 'arrived', helper.auth);
+    expect((await step(id, 'resolve', requesterAuth)).status).toBe(200);
+  });
+
+  it('refuses helper-only steps from the requester (403 HELPER_ONLY)', async () => {
+    const { id } = await acceptedSos();
+
+    const res = await step(id, 'en-route', requesterAuth);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('HELPER_ONLY');
+  });
+
+  it('refuses a helper skipping straight to arrived, and any step on a cancelled SOS', async () => {
+    const { id, helper } = await acceptedSos();
+
+    const skip = await step(id, 'arrived', helper.auth);
+    expect(skip.status).toBe(409);
+    expect(skip.body.error.code).toBe('INVALID_TRANSITION');
+
+    await request(app).post(`/sos/${id}/cancel`).set('Authorization', requesterAuth).send({});
+    const after = await step(id, 'en-route', helper.auth);
+    expect(after.status).toBe(409);
+    expect(after.body.error.message).toMatch(/already closed/);
+  });
+
+  it('answers 403 to anyone not involved', async () => {
+    const { id } = await acceptedSos();
+    const stranger = await otherUser({ phone: '+972507000001' });
+
+    const res = await step(id, 'en-route', stranger.auth);
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('NOT_YOUR_SOS');
+  });
+
+  it('stores one final helper position on resolve when a live position is known', async () => {
+    const { positions } = await import('../../src/services/positions.js');
+    const { id, helper } = await acceptedSos();
+    positions.set(helper.user.id, { lat: 32.0861, lng: 34.7819, accuracy: 8 });
+
+    await step(id, 'en-route', helper.auth);
+    await step(id, 'arrived', helper.auth);
+    await step(id, 'resolve', helper.auth);
+
+    const rows = await prisma.locationUpdate.findMany({ where: { sosId: id } });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ userId: helper.user.id, lat: 32.0861, lng: 34.7819 });
+    positions.clear();
+  });
+});

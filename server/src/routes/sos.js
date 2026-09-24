@@ -5,6 +5,7 @@ import { requireAuth } from '../middleware/requireAuth.js';
 import { validate } from '../middleware/validate.js';
 import * as sosService from '../services/sos.js';
 import * as lifecycle from '../services/sosLifecycle.js';
+import { STATUSES } from '../../../shared/constants.js';
 
 // ---------- Schemas ----------
 
@@ -60,3 +61,16 @@ sosRouter.post('/:id/decline', validate({ params: sosIdParams }), async (req, re
   await lifecycle.declineSos(req.validated.params.id, req.user.id);
   res.json({ ok: true });
 });
+
+// Progress steps. The helper reports en-route and arrived; either party may resolve once arrived.
+const progressRoute = (path, to) =>
+  sosRouter.post(`/:id/${path}`, validate({ params: sosIdParams }), async (req, res) => {
+    const { id } = req.validated.params;
+    await lifecycle.progressSos(id, req.user.id, to);
+    const { sos } = await sosService.getSos(id, req.user.id);
+    res.json({ sos });
+  });
+
+progressRoute('en-route', STATUSES.EN_ROUTE);
+progressRoute('arrived', STATUSES.ARRIVED);
+progressRoute('resolve', STATUSES.RESOLVED);

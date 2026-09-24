@@ -116,7 +116,7 @@ Client connects with `auth: { token }`. Server verifies JWT, joins `user:{id}`; 
 | `sos:new` | server -> matched helpers | `{ sosId, type, distanceM, requesterRating, createdAt }` |
 | `sos:taken` | server -> other notified helpers | `{ sosId }` |
 | `sos:accepted` | server -> requester | `{ sosId, helper: { id, name, photoUrl, ratingAvg, verified }, etaMin }` |
-| `sos:helper-location` | server -> requester | `{ sosId, lat, lng }` |
+| `sos:helper-location` | server -> requester | `{ sosId, lat, lng, at }` (forwarded from `helper:location` while the helper is assigned; sent to room `sos:{id}`) |
 | `sos:status` | server -> requester + helper | `{ sosId, status, at }` |
 | `sos:escalated` | server -> requester | `{ sosId, round, radiusKm }` |
 | `chat:message` | both | `{ sosId, id, senderId, body, sentAt }` |

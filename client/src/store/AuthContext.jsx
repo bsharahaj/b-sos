@@ -13,6 +13,9 @@ export const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [helperProfile, setHelperProfile] = useState(undefined);
+  // Set by the SOS page while this user is the assigned helper of an active SOS, so HelperPresence keeps
+  // streaming their position even if they've switched "available" off.
+  const [helpingSosId, setHelpingSosId] = useState(null);
   const [status, setStatus] = useState('loading');
 
   const startSession = useCallback(({ user: nextUser, accessToken }) => {
@@ -25,6 +28,7 @@ export function AuthProvider({ children }) {
     setAccessToken(null);
     setUser(null);
     setHelperProfile(undefined);
+    setHelpingSosId(null);
     setStatus('anonymous');
   }, []);
 
@@ -86,8 +90,8 @@ export function AuthProvider({ children }) {
   const updateUser = useCallback((nextUser) => setUser(nextUser), []);
 
   const value = useMemo(
-    () => ({ user, helperProfile, status, startSession, updateUser, setHelperProfile, logout }),
-    [user, helperProfile, status, startSession, updateUser, logout],
+    () => ({ user, helperProfile, helpingSosId, status, startSession, updateUser, setHelperProfile, setHelpingSosId, logout }),
+    [user, helperProfile, helpingSosId, status, startSession, updateUser, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

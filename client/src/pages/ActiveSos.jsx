@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { STATUSES } from '@shared/constants.js';
-import { acceptSos, cancelSos, declineSos, getSos } from '../api/sos.js';
+import { acceptSos, cancelSos, declineSos, getSos, markArrived, markEnRoute, resolveSos } from '../api/sos.js';
 import { useAuth } from '../hooks/useAuth.js';
 import { useAlerts } from '../hooks/useAlerts.js';
 import { useSocketEvent } from '../hooks/useSocket.js';
 import EmergencyBar from '../components/EmergencyBar.jsx';
 import { SOS_TYPE_DETAILS, SosTypeIcon } from '../components/SosTypePicker.jsx';
 import { formatDistance, formatRating } from '../components/AlertCard.jsx';
-import LocationMap from '../components/LocationMap.jsx';
+import LocationMap, { metresBetween } from '../components/LocationMap.jsx';
+import StatusTimeline from '../components/StatusTimeline.jsx';
 import FormAlert from '../components/FormAlert.jsx';
 import Button from '../components/Button.jsx';
 
@@ -102,7 +103,7 @@ export default function ActiveSos() {
 function SosDetails({ sos, onChange }) {
   const { user } = useAuth();
   if (sos.requester.id === user.id) return <RequesterView sos={sos} onChange={onChange} />;
-  if (sos.helper?.id === user.id) return <AssignedHelperView sos={sos} />;
+  if (sos.helper?.id === user.id) return <AssignedHelperView sos={sos} onChange={onChange} />;
   return <AlertedHelperView sos={sos} onChange={onChange} />;
 }
 
@@ -138,7 +139,7 @@ function SentAt({ iso }) {
   return <time dateTime={iso}>{new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>;
 }
 
-function SosMap({ location, note }) {
+function SosMap({ location, note, helperPin = null }) {
   if (location?.lat === undefined) return null;
   const approximate = location.precision === 'APPROXIMATE';
   return (
@@ -146,8 +147,9 @@ function SosMap({ location, note }) {
       <LocationMap
         pin={{ lat: location.lat, lng: location.lng }}
         accuracy={approximate ? location.radiusM : location.accuracyM ?? null}
+        helperPin={helperPin}
         interactive={false}
-        className="h-56 w-full"
+        className={helperPin ? 'h-72 w-full' : 'h-56 w-full'}
       />
       {note && <p className="text-sm text-ink-muted">{note}</p>}
     </div>
@@ -267,9 +269,38 @@ function AlertedHelperView({ sos, onChange }) {
 
 // ---------- assigned helper: go ----------
 
-function AssignedHelperView({ sos }) {
+function AssignedHelperView({ sos, onChange }) {
+  const { setHelpingSosId } = useAuth();
   const { label } = SOS_TYPE_DETAILS[sos.type];
   const active = HELPER_ACTIVE.includes(sos.status);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  // Keep streaming our position to the requester for as long as we're actively helping.
+  useEffect(() => {
+    setHelpingSosId(active ? sos.id : null);
+    return () => setHelpingSosId(null);
+  }, [active, sos.id, setHelpingSosId]);
+
+  const run = async (action) => {
+    setError('');
+    setBusy(true);
+    try {
+      const { sos: updated } = await action(sos.id);
+      onChange(updated);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const nextStep = {
+    [STATUSES.ACCEPTED]: { label: "I'm on my way", action: markEnRoute },
+    [STATUSES.EN_ROUTE]: { label: "I've arrived", action: markArrived },
+    [STATUSES.ARRIVED]: { label: 'Mark as resolved', action: resolveSos },
+  }[sos.status];
+
   const heading = {
     [STATUSES.ACCEPTED]: "You're helping. Head to the location.",
     [STATUSES.EN_ROUTE]: "You're on the way.",
@@ -309,32 +340,97 @@ function AssignedHelperView({ sos }) {
         )}
       </dl>
 
+      <div className="glass rounded-3xl p-4">
+        <StatusTimeline status={sos.status} />
+      </div>
+
       <SosMap location={sos.location} note={active ? 'Exact location. Only you and the requester can see it while the SOS is active.' : null} />
 
       {active && (
-        <a
-          href={`https://www.google.com/maps/dir/?api=1&destination=${sos.location.lat},${sos.location.lng}`}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-primary px-5 font-semibold text-on-primary shadow-glow-primary hover:bg-primary-hover focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
-          Open directions
-        </a>
+        <div className="flex flex-col gap-3">
+          {error && <FormAlert>{error}</FormAlert>}
+          {nextStep && (
+            <Button onClick={() => run(nextStep.action)} loading={busy} className="min-h-14 text-lg">
+              {busy ? 'Saving…' : nextStep.label}
+            </Button>
+          )}
+          <a
+            href={`https://www.google.com/maps/dir/?api=1&destination=${sos.location.lat},${sos.location.lng}`}
+            target="_blank"
+            rel="noreferrer"
+            className="glass inline-flex min-h-12 w-full items-center justify-center rounded-2xl px-5 font-semibold text-ink hover:bg-surface-strong focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            Open directions
+          </a>
+          {[STATUSES.ACCEPTED, STATUSES.EN_ROUTE].includes(sos.status) && (
+            <HelperCancel sosId={sos.id} onCancelled={onChange} />
+          )}
+        </div>
       )}
       {!active && <PrimaryLink to="/">Back to home</PrimaryLink>}
     </>
   );
 }
 
+// A helper backing out. Kept deliberately quiet; the server counts it against them later (CLAUDE.md §4).
+function HelperCancel({ sosId, onCancelled }) {
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const cancel = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const { sos } = await cancelSos(sosId, 'Helper could not continue');
+      onCancelled(sos);
+    } catch (err) {
+      setError(err.message);
+      setBusy(false);
+    }
+  };
+
+  if (!confirm) {
+    return (
+      <button
+        type="button"
+        onClick={() => setConfirm(true)}
+        className="min-h-11 self-center text-sm font-medium text-ink-muted underline-offset-4 hover:text-ink hover:underline focus-visible:outline-3 focus-visible:outline-primary"
+      >
+        I can't continue
+      </button>
+    );
+  }
+  return (
+    <div className="glass flex flex-col gap-3 rounded-3xl p-4">
+      <p className="text-sm text-ink">Cancel your help? The requester will be told, and their SOS will need another helper.</p>
+      {error && <FormAlert>{error}</FormAlert>}
+      <Button variant="secondary" onClick={cancel} loading={busy}>
+        {busy ? 'Cancelling…' : 'Yes, I have to stop'}
+      </Button>
+      <Button variant="secondary" onClick={() => setConfirm(false)} disabled={busy}>
+        Keep helping
+      </Button>
+    </div>
+  );
+}
+
 // ---------- requester ----------
+
+const ETA_METRES_PER_MIN = 333; // ~20 km/h, same rough figure as the server
 
 function RequesterView({ sos, onChange }) {
   const { title, body } = STATUS_TEXT[sos.status];
   const isOpen = sos.status === STATUSES.OPEN;
+  const helperActive = HELPER_ACTIVE.includes(sos.status);
   const canCancel = REQUESTER_CANCELLABLE.includes(sos.status);
+  const canResolve = sos.status === STATUSES.ARRIVED;
   const [etaMin, setEtaMin] = useState(null);
+  const [helperPin, setHelperPin] = useState(null);
+  const [resolving, setResolving] = useState(false);
+  const [resolveError, setResolveError] = useState('');
 
-  // The accept event carries the ETA, which the REST record doesn't have.
+  // The accept event carries a first ETA; afterwards the helper's live position refines it.
   const onAccepted = useCallback(
     (event) => {
       if (event.sosId === sos.id) setEtaMin(event.etaMin);
@@ -342,6 +438,35 @@ function RequesterView({ sos, onChange }) {
     [sos.id],
   );
   useSocketEvent('sos:accepted', onAccepted);
+
+  const onHelperLocation = useCallback(
+    (event) => {
+      if (event.sosId !== sos.id) return;
+      const pin = { lat: event.lat, lng: event.lng };
+      setHelperPin(pin);
+      if (sos.location?.lat !== undefined) {
+        setEtaMin(Math.max(1, Math.ceil(metresBetween(pin, sos.location) / ETA_METRES_PER_MIN)));
+      }
+    },
+    [sos.id, sos.location],
+  );
+  useSocketEvent('sos:helper-location', onHelperLocation);
+
+  const showHelperPin = helperActive && sos.status !== STATUSES.ARRIVED ? helperPin : null;
+  const helperDistance = helperPin && sos.location?.lat !== undefined ? metresBetween(helperPin, sos.location) : null;
+
+  const resolve = async () => {
+    setResolveError('');
+    setResolving(true);
+    try {
+      const { sos: updated } = await resolveSos(sos.id);
+      onChange(updated);
+    } catch (err) {
+      setResolveError(err.message);
+    } finally {
+      setResolving(false);
+    }
+  };
 
   return (
     <>
@@ -362,16 +487,21 @@ function RequesterView({ sos, onChange }) {
             label="Your helper"
             person={sos.helper}
             trailing={
-              etaMin !== null && HELPER_ACTIVE.includes(sos.status) ? (
+              etaMin !== null && helperActive && sos.status !== STATUSES.ARRIVED ? (
                 <div className="text-end">
                   <p className="text-sm text-ink-muted">About</p>
                   <p className="text-lg font-semibold text-primary">{etaMin} min</p>
+                  {helperDistance !== null && <p className="text-xs text-ink-muted">{formatDistance(helperDistance)}</p>}
                 </div>
               ) : null
             }
           />
         </div>
       )}
+
+      <div className="glass rounded-3xl p-4">
+        <StatusTimeline status={sos.status} />
+      </div>
 
       <dl className="glass flex flex-col gap-4 rounded-3xl p-4">
         <div className="flex items-center gap-3">
@@ -397,10 +527,22 @@ function RequesterView({ sos, onChange }) {
         )}
       </dl>
 
-      <SosMap location={sos.location} />
+      <SosMap
+        location={sos.location}
+        helperPin={showHelperPin}
+        note={showHelperPin ? 'The teal dot is your helper, updating live.' : helperActive && !helperPin ? 'Waiting for your helper’s location…' : null}
+      />
 
+      {canResolve && (
+        <div className="flex flex-col gap-2">
+          {resolveError && <FormAlert>{resolveError}</FormAlert>}
+          <Button onClick={resolve} loading={resolving} className="min-h-14 text-lg">
+            {resolving ? 'Saving…' : "I'm okay now — resolve"}
+          </Button>
+        </div>
+      )}
       {canCancel && <CancelPanel sosId={sos.id} onCancelled={onChange} />}
-      {sos.status === STATUSES.CANCELLED && <PrimaryLink to="/">Back to home</PrimaryLink>}
+      {[STATUSES.CANCELLED, STATUSES.RESOLVED].includes(sos.status) && <PrimaryLink to="/">Back to home</PrimaryLink>}
     </>
   );
 }
