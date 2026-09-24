@@ -72,7 +72,7 @@ function SosDetails({ sos }) {
 
   return (
     <>
-      <section role="status" className="flex items-start gap-4 rounded-2xl border border-primary/30 bg-primary-soft p-4">
+      <section role="status" className="flex items-start gap-4 rounded-3xl border border-primary/30 bg-primary-soft p-4 backdrop-blur">
         <span className="relative mt-1 flex size-4 shrink-0" aria-hidden="true">
           {isOpen && <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-40 [animation-duration:2s] motion-reduce:hidden" />}
           <span className="relative inline-flex size-4 rounded-full bg-primary" />
@@ -83,7 +83,7 @@ function SosDetails({ sos }) {
         </div>
       </section>
 
-      <dl className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-4">
+      <dl className="glass flex flex-col gap-4 rounded-3xl p-4">
         <div className="flex items-center gap-3">
           <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary-soft text-primary">
             <SosTypeIcon type={sos.type} className="size-6" />

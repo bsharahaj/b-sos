@@ -15,8 +15,8 @@ const pinIcon = L.divIcon({
   iconSize: [36, 48],
   iconAnchor: [18, 46],
   html: `<svg width="36" height="48" viewBox="0 0 36 48" aria-hidden="true">
-    <path d="M18 46s16-15.2 16-28A16 16 0 0 0 2 18c0 12.8 16 28 16 28Z" fill="#0f172a" stroke="#fff" stroke-width="2.5"/>
-    <circle cx="18" cy="18" r="6" fill="#fff"/></svg>`,
+    <path d="M18 46s16-15.2 16-28A16 16 0 0 0 2 18c0 12.8 16 28 16 28Z" fill="#2dd4bf" stroke="#0b1220" stroke-width="2.5"/>
+    <circle cx="18" cy="18" r="6" fill="#0b1220"/></svg>`,
 });
 
 // Approximate ground distance covered by `pixels` at this zoom and latitude (Web Mercator).
@@ -81,16 +81,18 @@ export default function LocationMap({ pin, accuracy = null, followPin = true, on
       touchZoom={interactive}
       keyboard={interactive}
     >
+      {/* Dark basemap to match the theme. CARTO's free tier is fine for development; pick a paid plan before launch. */}
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        subdomains="abcd"
         maxZoom={19}
       />
       {pin && accuracy !== null && (
         <Circle
           center={[pin.lat, pin.lng]}
           radius={accuracy}
-          pathOptions={{ color: '#0369a1', weight: 1.5, fillColor: '#0369a1', fillOpacity: 0.12 }}
+          pathOptions={{ color: '#2dd4bf', weight: 1.5, fillColor: '#2dd4bf', fillOpacity: 0.14 }}
         />
       )}
       {pin && <Pin pin={pin} draggable={interactive} onMove={onPinChange} />}

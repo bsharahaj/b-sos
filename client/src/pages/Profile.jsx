@@ -37,7 +37,7 @@ export default function Profile() {
           </svg>
           Home
         </Link>
-        <h1 className="text-2xl font-semibold text-ink">Your profile</h1>
+        <h1 className="text-[1.75rem] font-medium text-ink">Your profile</h1>
       </header>
 
       {loadError && (
@@ -64,7 +64,7 @@ export default function Profile() {
 function Section({ title, description, children }) {
   const headingId = `${title.replace(/\s+/g, '-').toLowerCase()}-heading`;
   return (
-    <section aria-labelledby={headingId} className="rounded-2xl border border-line bg-surface p-4 sm:p-6">
+    <section aria-labelledby={headingId} className="glass rounded-3xl p-4 sm:p-6">
       <h2 id={headingId} className="text-lg font-semibold text-ink">
         {title}
       </h2>

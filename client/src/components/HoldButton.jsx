@@ -37,11 +37,11 @@ export default function HoldButton({ onConfirm, holdMs = 1000, disabled = false,
         onClick={(event) => {
           if (event.detail === 0 && !disabled && !loading) onConfirm();
         }}
-        className="relative isolate min-h-16 w-full touch-none select-none overflow-hidden rounded-2xl bg-sos px-6 text-lg font-bold text-white shadow-sm transition-colors hover:bg-sos-hover focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-60"
+        className="relative isolate min-h-16 w-full touch-none select-none overflow-hidden rounded-2xl bg-linear-to-r from-sos to-sos-hover px-6 text-lg font-semibold text-white shadow-[0_18px_40px_-16px_rgba(220,38,38,0.8)] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
       >
         <span
           aria-hidden="true"
-          className="absolute inset-0 -z-10 origin-left bg-black/25 ease-linear rtl:origin-right"
+          className="absolute inset-0 -z-10 origin-left bg-black/30 ease-linear rtl:origin-right"
           style={{
             transform: holding ? 'scaleX(1)' : 'scaleX(0)',
             transitionProperty: 'transform',

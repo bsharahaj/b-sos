@@ -28,15 +28,15 @@ export default function SkillPicker({ value, onChange, legend, error }) {
           return (
             <label
               key={skill}
-              className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary ${
-                checked ? 'border-primary bg-primary-soft' : 'border-line-strong bg-surface hover:bg-canvas'
+              className={`flex min-h-12 cursor-pointer items-start gap-3 rounded-2xl border p-3 transition-colors has-focus-visible:outline-3 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary ${
+                checked ? 'border-primary/70 bg-primary-soft' : 'border-line bg-surface hover:bg-surface-strong'
               }`}
             >
               <input type="checkbox" className="sr-only" checked={checked} onChange={() => toggle(skill)} />
               <span
                 aria-hidden="true"
                 className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border-2 ${
-                  checked ? 'border-primary bg-primary text-white' : 'border-line-strong bg-surface'
+                  checked ? 'border-primary bg-primary text-on-primary' : 'border-line-strong bg-transparent'
                 }`}
               >
                 {checked && (

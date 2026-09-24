@@ -53,14 +53,14 @@ function VerifyFirst() {
   return (
     <>
       <BackLink to="/">Home</BackLink>
-      <h1 className="text-2xl font-semibold text-ink">Verify your phone first</h1>
+      <h1 className="text-[1.75rem] font-medium leading-tight text-ink">Verify your phone first</h1>
       <p className="text-base text-ink-muted">
         To keep B SOS trustworthy, every request comes from a verified phone number. It only takes a minute.
       </p>
       <Link
         to="/verify-phone"
         state={{ from: '/sos/new' }}
-        className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-5 text-base font-semibold text-white hover:bg-primary-hover focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-primary px-5 text-base font-semibold text-on-primary shadow-glow-primary hover:bg-primary-hover focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary"
       >
         Verify my phone
       </Link>
@@ -126,7 +126,7 @@ function SosFlow() {
     return (
       <>
         <BackLink to="/">Home</BackLink>
-        <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold text-ink focus:outline-none">
+        <h1 ref={headingRef} tabIndex={-1} className="text-[1.75rem] font-medium leading-tight text-ink focus:outline-none">
           What's happening?
         </h1>
         <SosTypePicker onSelect={setType} />
@@ -143,7 +143,7 @@ function SosFlow() {
         </span>
         <div>
           <p className="text-sm text-ink-muted">{SOS_TYPE_DETAILS[type].label}</p>
-          <h1 ref={headingRef} tabIndex={-1} className="text-2xl font-semibold text-ink focus:outline-none">
+          <h1 ref={headingRef} tabIndex={-1} className="text-[1.75rem] font-medium leading-tight text-ink focus:outline-none">
             Where are you?
           </h1>
         </div>
@@ -169,7 +169,7 @@ function SosFlow() {
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           placeholder="e.g. Grey car on the roadside, front tyre flat"
-          className="w-full rounded-xl border border-line-strong bg-surface px-4 py-3 text-base text-ink placeholder:text-ink-muted/70 focus:border-primary focus:outline-3 focus:outline-primary/25"
+          className="w-full rounded-2xl border border-line-strong bg-white/5 px-4 py-3 text-base text-ink placeholder:text-ink-muted/60 focus:border-primary focus:bg-white/8 focus:outline-3 focus:outline-primary/30"
         />
         <p className="text-end text-sm text-ink-muted">
           {description.length}/{DESCRIPTION_MAX}
@@ -241,7 +241,7 @@ function RetryButton({ onClick }) {
 }
 
 const TONES = {
-  neutral: { className: 'bg-canvas text-ink-muted border-line', icon: 'M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10Z M12 13a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z' },
+  neutral: { className: 'glass text-ink-muted', icon: 'M12 21s-6-5.2-6-10a6 6 0 1 1 12 0c0 4.8-6 10-6 10Z M12 13a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z' },
   warning: { className: 'bg-warning-soft text-warning border-warning/30', icon: 'M12 9v4M12 17h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z' },
   success: { className: 'bg-success-soft text-success border-success/30', icon: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z M8 12.5l2.5 2.5L16 9.5' },
 };

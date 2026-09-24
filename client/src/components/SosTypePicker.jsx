@@ -39,7 +39,7 @@ export default function SosTypePicker({ onSelect }) {
             <button
               type="button"
               onClick={() => onSelect(type)}
-              className="flex h-full min-h-32 w-full flex-col items-start gap-2 rounded-2xl border border-line-strong bg-surface p-4 text-start transition-colors hover:border-primary hover:bg-primary-soft focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="glass flex h-full min-h-32 w-full flex-col items-start gap-2 rounded-3xl p-4 text-start transition-colors hover:border-primary/60 hover:bg-primary-soft focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <span className="flex size-11 items-center justify-center rounded-xl bg-primary-soft text-primary">
                 <SosTypeIcon type={type} />

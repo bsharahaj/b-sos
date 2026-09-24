@@ -34,10 +34,10 @@ export default function Switch({ checked, onChange, label, description, disabled
         </span>
         <span
           aria-hidden="true"
-          className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-150 ${checked ? 'bg-primary' : 'bg-line-strong'}`}
+          className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors duration-150 ${checked ? 'bg-primary' : 'bg-white/15'}`}
         >
           <span
-            className={`absolute size-6 rounded-full bg-white shadow transition-[inset-inline-start] duration-150 motion-reduce:transition-none ${
+            className={`absolute size-6 rounded-full shadow transition-[inset-inline-start] duration-150 motion-reduce:transition-none ${checked ? 'bg-on-primary' : 'bg-ink'} ${
               checked ? 'start-7' : 'start-1'
             }`}
           />

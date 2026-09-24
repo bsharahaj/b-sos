@@ -26,8 +26,8 @@ const TextField = forwardRef(function TextField(
           aria-invalid={error ? true : undefined}
           aria-describedby={describedBy}
           // text-base (16px) stops iOS Safari zooming in on focus.
-          className={`min-h-12 w-full rounded-xl border bg-surface px-4 text-base text-ink placeholder:text-ink-muted/70 transition-colors focus:outline-3 focus:outline-offset-0 ${
-            error ? 'border-error focus:outline-error/25' : 'border-line-strong focus:border-primary focus:outline-primary/25'
+          className={`min-h-12 w-full rounded-2xl border bg-white/5 px-4 text-base text-ink placeholder:text-ink-muted/60 transition-colors focus:bg-white/8 focus:outline-3 focus:outline-offset-0 ${
+            error ? 'border-error/70 focus:outline-error/30' : 'border-line-strong focus:border-primary focus:outline-primary/30'
           } ${trailing ? 'pe-12' : ''} ${inputClassName}`}
           {...inputProps}
         />

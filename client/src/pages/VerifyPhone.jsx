@@ -138,7 +138,7 @@ export default function VerifyPhone() {
     return (
       <AuthLayout title="Phone verified">
         <div className="flex flex-col gap-6">
-          <div role="status" className="flex items-start gap-3 rounded-xl border border-success/30 bg-success-soft p-4 text-success">
+          <div role="status" className="flex items-start gap-3 rounded-2xl border border-success/30 bg-success-soft p-4 text-success">
             <CheckIcon />
             <p className="text-base">
               <span className="font-semibold">You're all set.</span>{' '}
@@ -200,7 +200,7 @@ export default function VerifyPhone() {
       <form noValidate onSubmit={onVerify} className="flex flex-col gap-5">
         {formError && <FormAlert ref={alertRef}>{formError}</FormAlert>}
         {notice && (
-          <p role="status" className="rounded-xl bg-primary-soft p-4 text-sm text-primary-hover">
+          <p role="status" className="rounded-2xl border border-primary/30 bg-primary-soft p-4 text-sm text-primary">
             {notice}
           </p>
         )}

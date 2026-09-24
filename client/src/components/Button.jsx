@@ -1,6 +1,6 @@
 const VARIANTS = {
-  primary: 'bg-primary text-white hover:bg-primary-hover disabled:bg-primary/60',
-  secondary: 'border border-primary bg-surface text-primary hover:bg-primary-soft disabled:opacity-60',
+  primary: 'bg-primary text-on-primary shadow-glow-primary hover:bg-primary-hover disabled:bg-primary/50 disabled:shadow-none',
+  secondary: 'glass text-ink hover:bg-surface-strong disabled:opacity-60',
 };
 
 // 48px tall, full width on phones. `loading` keeps the label visible so the button doesn't jump in size.
@@ -10,7 +10,7 @@ export default function Button({ variant = 'primary', loading = false, disabled,
       type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-5 text-base font-semibold transition-colors duration-150 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed ${VARIANTS[variant]} ${className}`}
+      className={`inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl px-5 text-base font-semibold transition-colors duration-150 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed ${VARIANTS[variant]} ${className}`}
       {...props}
     >
       {loading && <Spinner />}

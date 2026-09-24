@@ -7,7 +7,7 @@ const FormAlert = forwardRef(function FormAlert({ children }, ref) {
       ref={ref}
       role="alert"
       tabIndex={-1}
-      className="flex items-start gap-3 rounded-xl border border-error/30 bg-error-soft p-4 text-sm text-error focus:outline-none"
+      className="flex items-start gap-3 rounded-2xl border border-error/30 bg-error-soft p-4 text-sm text-error focus:outline-none"
     >
       <svg className="mt-0.5 size-5 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
         <path

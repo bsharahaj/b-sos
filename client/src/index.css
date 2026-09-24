@@ -1,40 +1,78 @@
 @import 'tailwindcss';
 
-/* Option A "Calm Clarity" tokens. Use these names (bg-surface, text-ink, bg-primary…) instead of raw hex.
-   Red (sos) is reserved for the SOS action only; warnings use amber. */
+/* "Beacon" design tokens: deep navy canvas, frosted-glass surfaces, mint-teal for live/primary actions.
+   Red (sos) is reserved for the SOS action only; warnings use amber.
+   Use these names (bg-canvas, text-ink, bg-primary…) instead of raw hex so the theme stays in one place. */
 @theme {
-  --font-sans: 'IBM Plex Sans Arabic', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'Readex Pro', ui-sans-serif, system-ui, sans-serif;
 
-  --color-canvas: #f8fafc;
-  --color-surface: #ffffff;
-  --color-ink: #0f172a;
-  --color-ink-muted: #475569;
-  --color-line: #e2e8f0;
-  --color-line-strong: #94a3b8;
+  --color-canvas: #0b1220;
+  --color-canvas-raised: #111a2e;
+  --color-surface: rgba(255, 255, 255, 0.06);
+  --color-surface-strong: rgba(255, 255, 255, 0.1);
+  --color-ink: #f1f5f9;
+  --color-ink-muted: #94a3b8;
+  --color-line: rgba(255, 255, 255, 0.1);
+  --color-line-strong: rgba(255, 255, 255, 0.22);
 
-  --color-primary: #0369a1;
-  --color-primary-hover: #075985;
-  --color-primary-soft: #e0f2fe;
+  --color-primary: #2dd4bf;
+  --color-primary-hover: #5eead4;
+  --color-primary-soft: rgba(45, 212, 191, 0.14);
+  --color-on-primary: #06201d;
 
   --color-sos: #dc2626;
-  --color-sos-hover: #b91c1c;
+  --color-sos-hover: #ef4444;
 
-  --color-warning: #b45309;
-  --color-warning-soft: #fffbeb;
-  --color-success: #15803d;
-  --color-success-soft: #f0fdf4;
-  --color-error: #b91c1c;
-  --color-error-soft: #fef2f2;
+  --color-warning: #fcd34d;
+  --color-warning-soft: rgba(251, 191, 36, 0.12);
+  --color-success: #4ade80;
+  --color-success-soft: rgba(74, 222, 128, 0.12);
+  --color-error: #fca5a5;
+  --color-error-soft: rgba(248, 113, 113, 0.14);
+
+  --shadow-glow-sos: 0 0 0 14px rgba(220, 38, 38, 0.12), 0 0 0 30px rgba(220, 38, 38, 0.05), 0 30px 60px -20px rgba(220, 38, 38, 0.55);
+  --shadow-glow-primary: 0 18px 40px -18px rgba(45, 212, 191, 0.55);
 }
 
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
+    color-scheme: dark;
   }
 
   body {
-    @apply bg-canvas font-sans text-ink antialiased;
+    @apply font-sans text-ink antialiased;
+    /* Soft light from the top, like a beacon; fixed so it doesn't scroll with content. */
+    background:
+      radial-gradient(120% 60% at 50% -10%, #14294a 0%, transparent 60%),
+      var(--color-canvas);
+    background-attachment: fixed;
     /* Arabic needs more vertical room than Latin; 1.6 suits both. */
     line-height: 1.6;
   }
+
+  /* Leaflet controls and attribution on the dark map. */
+  .leaflet-bar a {
+    background: #111a2e !important;
+    color: #f1f5f9 !important;
+    border-bottom-color: rgba(255, 255, 255, 0.12) !important;
+  }
+  .leaflet-bar a.leaflet-disabled {
+    color: #64748b !important;
+  }
+  .leaflet-control-attribution {
+    background: rgba(11, 18, 32, 0.8) !important;
+    color: #94a3b8 !important;
+  }
+  .leaflet-control-attribution a {
+    color: #2dd4bf !important;
+  }
+}
+
+/* Frosted card. */
+@utility glass {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-line);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
 }
