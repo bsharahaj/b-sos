@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import HelperPresence from './HelperPresence.jsx';
+import AlertBanner from './AlertBanner.jsx';
 
 // Wrap routes that need a signed-in user. Remembers where the user was going so Login can send them back.
 // HelperPresence lives here so an available helper shares their location on every signed-in screen.
@@ -13,6 +14,7 @@ export function RequireAuth() {
   return (
     <>
       <HelperPresence />
+      <AlertBanner />
       <Outlet />
     </>
   );

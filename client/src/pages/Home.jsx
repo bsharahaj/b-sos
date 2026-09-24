@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import { useAlerts } from '../hooks/useAlerts.js';
 import Logo from '../components/Logo.jsx';
 import { EMERGENCY_NUMBERS } from '../components/EmergencyBar.jsx';
 
@@ -14,6 +15,7 @@ export default function Home() {
   const { user, helperProfile, logout } = useAuth();
   const firstName = user.name.trim().split(/\s+/)[0];
   const helping = Boolean(helperProfile?.isAvailable);
+  const { alerts } = useAlerts();
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
@@ -93,14 +95,22 @@ export default function Home() {
 
       <div className="grid grid-cols-2 gap-3">
         <Link
-          to="/profile"
-          className="glass flex min-h-24 flex-col justify-between rounded-2xl p-4 hover:bg-surface-strong focus-visible:outline-3 focus-visible:outline-primary"
+          to={alerts.length > 0 ? '/alerts' : '/profile'}
+          className={`glass relative flex min-h-24 flex-col justify-between rounded-2xl p-4 hover:bg-surface-strong focus-visible:outline-3 focus-visible:outline-primary ${
+            alerts.length > 0 ? 'border-sos/40' : ''
+          }`}
         >
           <span className="text-sm text-ink-muted">Helping others</span>
-          <span className="flex items-center gap-2 text-base font-semibold text-ink">
-            {helping && <span aria-hidden="true" className="inline-flex size-2.5 rounded-full bg-primary" />}
-            {helperProfile === undefined ? '…' : helping ? 'Available' : 'Not available'}
-          </span>
+          {alerts.length > 0 ? (
+            <span className="text-base font-semibold text-ink">
+              <span className="text-sos">{alerts.length}</span> {alerts.length === 1 ? 'SOS alert' : 'SOS alerts'}
+            </span>
+          ) : (
+            <span className="flex items-center gap-2 text-base font-semibold text-ink">
+              {helping && <span aria-hidden="true" className="inline-flex size-2.5 rounded-full bg-primary" />}
+              {helperProfile === undefined ? '…' : helping ? 'Available' : 'Not available'}
+            </span>
+          )}
         </Link>
         <div className="glass flex min-h-24 flex-col justify-between rounded-2xl p-4">
           <span className="text-sm text-ink-muted">Emergency</span>

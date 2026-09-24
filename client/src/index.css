@@ -69,6 +69,17 @@
   }
 }
 
+@keyframes slide-down {
+  from {
+    transform: translateY(-120%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 /* Frosted card. */
 @utility glass {
   background-color: var(--color-surface);

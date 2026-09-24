@@ -20,6 +20,16 @@ export async function cancelSos(id, reason) {
   }
 }
 
+// Open SOS this user was alerted about as a helper. Resolves to { alerts: [{ sentAt, distanceM, sos }] }.
+export async function getAlerts() {
+  try {
+    const { data } = await http.get('/sos/alerts');
+    return data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}
+
 // Resolves to { sos }.
 export async function getSos(id) {
   try {

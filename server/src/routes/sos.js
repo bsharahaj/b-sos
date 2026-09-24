@@ -32,6 +32,11 @@ sosRouter.post('/', validate({ body: createSosSchema }), async (req, res) => {
   res.status(201).json(await sosService.createSos(req.user.id, req.body));
 });
 
+// Declared before '/:id' so "alerts" isn't parsed as an id.
+sosRouter.get('/alerts', async (req, res) => {
+  res.json(await sosService.listAlerts(req.user.id));
+});
+
 sosRouter.get('/:id', validate({ params: sosIdParams }), async (req, res) => {
   res.json(await sosService.getSos(req.validated.params.id, req.user.id));
 });

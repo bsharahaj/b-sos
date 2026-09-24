@@ -1,7 +1,10 @@
 import { STATUSES } from '../../../shared/constants.js';
 import { prisma } from '../config/prisma.js';
+import { logger } from '../config/logger.js';
 import { HttpError } from '../utils/httpError.js';
-import { COARSE_RADIUS_M, coarsen } from '../utils/geo.js';
+import { COARSE_RADIUS_M, coarsen, haversineM } from '../utils/geo.js';
+import { alertHelpersForSos } from './notifications.js';
+import { positions } from './positions.js';
 
 export const MAX_SOS_PER_DAY = 3;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -82,17 +85,53 @@ export async function createSos(userId, input) {
     });
   });
 
+  // The SOS exists from here on; a failure while alerting must not turn into an error for the requester.
+  try {
+    await alertHelpersForSos(sos, { round: 1 });
+  } catch (err) {
+    logger.error({ err, sosId: sos.id }, 'Alerting helpers failed');
+  }
+
   return { sos: toSosView(sos, userId) };
 }
 
-// TODO(matching): once SosNotification rows are written, narrow access to the requester, the assigned
-// helper, helpers notified about this SOS, and admins; everyone else should get 404 SOS_NOT_FOUND.
-// For now any logged-in user can read an SOS by id, but only ever with the approximate location.
+// Readable by the requester, the assigned helper, and helpers who were alerted about it.
+// Everyone else gets the same 404 as an unknown id, so the endpoint can't be used to probe for SOS.
+// TODO(admin): allow ADMIN role when the admin API lands.
 export async function getSos(sosId, viewerId) {
-  const sos = await prisma.sosRequest.findUnique({ where: { id: sosId }, select: SOS_SELECT });
-  if (!sos) throw new HttpError(404, 'SOS_NOT_FOUND', 'This SOS does not exist.');
+  const sos = await prisma.sosRequest.findUnique({
+    where: { id: sosId },
+    select: { ...SOS_SELECT, notifications: { where: { helperId: viewerId }, select: { id: true }, take: 1 } },
+  });
+  const involved = sos && (sos.requesterId === viewerId || sos.helperId === viewerId || sos.notifications.length > 0);
+  if (!involved) throw new HttpError(404, 'SOS_NOT_FOUND', 'This SOS does not exist.');
 
-  return { sos: toSosView(sos, viewerId) };
+  const { notifications, ...record } = sos;
+  return { sos: toSosView(record, viewerId) };
+}
+
+// Open SOS this helper was alerted about and hasn't answered yet, newest first, with the distance from
+// the helper's last known position (live store first, then the persisted profile position).
+export async function listAlerts(helperId) {
+  const notes = await prisma.sosNotification.findMany({
+    where: { helperId, response: 'NONE', sos: { status: STATUSES.OPEN } },
+    orderBy: { sentAt: 'desc' },
+    select: { sentAt: true, sos: { select: SOS_SELECT } },
+  });
+
+  let me = positions.get(helperId);
+  if (!me && notes.length > 0) {
+    const profile = await prisma.helperProfile.findUnique({ where: { userId: helperId }, select: { lat: true, lng: true } });
+    if (profile?.lat != null) me = profile;
+  }
+
+  return {
+    alerts: notes.map(({ sentAt, sos }) => ({
+      sentAt,
+      distanceM: me ? Math.round(haversineM(me, sos)) : null,
+      sos: toSosView(sos, helperId),
+    })),
+  };
 }
 
 function canSeeExactLocation(sos, viewerId) {

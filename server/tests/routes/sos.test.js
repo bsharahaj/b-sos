@@ -204,8 +204,9 @@ describe('GET /sos/:id', () => {
     expect(res.body.sos.location).toEqual({ precision: 'EXACT', lat: 32.08534, lng: 34.78176, accuracyM: 14 });
   });
 
-  it('shows anyone else only an approximate location and the requester public fields', async () => {
-    const { auth } = await otherUser();
+  it('shows an alerted helper only an approximate location and the requester public fields', async () => {
+    const { user: helper, auth } = await otherUser();
+    await prisma.sosNotification.create({ data: { sosId, helperId: helper.id, channel: 'SOCKET', round: 1 } });
     const res = await getSos(sosId, auth);
 
     expect(res.status).toBe(200);
@@ -254,6 +255,14 @@ describe('GET /sos/:id', () => {
 
   it('returns 404 SOS_NOT_FOUND for an unknown id', async () => {
     const res = await getSos('00000000-0000-4000-8000-000000000000', requesterAuth);
+
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe('SOS_NOT_FOUND');
+  });
+
+  it('returns the same 404 to a user who was never involved', async () => {
+    const { auth } = await otherUser();
+    const res = await getSos(sosId, auth);
 
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe('SOS_NOT_FOUND');
@@ -349,5 +358,51 @@ describe('POST /sos/:id/cancel', () => {
     expect((await cancel(created.sos.id, requesterAuth, { reason: 'x'.repeat(201) })).status).toBe(400);
     expect((await cancel('not-a-uuid')).status).toBe(400);
     expect((await cancel('00000000-0000-4000-8000-000000000000')).status).toBe(404);
+  });
+});
+
+describe('GET /sos/alerts', () => {
+  const getAlerts = (auth) => request(app).get('/sos/alerts').set('Authorization', auth);
+
+  // A helper 200 m north of the SOS, available with a matching skill, so createSos alerts them.
+  async function nearbyHelper() {
+    const { user, auth } = await otherUser({ phone: '+972504444444' });
+    await prisma.helperProfile.create({
+      data: { userId: user.id, skills: ['GENERAL'], isAvailable: true, lat: validSos.lat + 0.0018, lng: validSos.lng, lastSeenAt: new Date() },
+    });
+    return { user, auth };
+  }
+
+  it('lists open SOS the helper was alerted about, with the distance', async () => {
+    const helper = await nearbyHelper();
+    const { body: created } = await postSos();
+
+    const res = await getAlerts(helper.auth);
+
+    expect(res.status).toBe(200);
+    expect(res.body.alerts).toHaveLength(1);
+    expect(res.body.alerts[0]).toMatchObject({
+      distanceM: expect.any(Number),
+      sos: { id: created.sos.id, type: 'MEDICAL', status: 'OPEN', location: { precision: 'APPROXIMATE' } },
+    });
+    expect(res.body.alerts[0].distanceM).toBeGreaterThan(150);
+    expect(res.body.alerts[0].distanceM).toBeLessThan(250);
+  });
+
+  it('drops alerts once the SOS is no longer open', async () => {
+    const helper = await nearbyHelper();
+    const { body: created } = await postSos();
+    await request(app).post(`/sos/${created.sos.id}/cancel`).set('Authorization', requesterAuth).send({});
+
+    const res = await getAlerts(helper.auth);
+
+    expect(res.body.alerts).toEqual([]);
+  });
+
+  it('is empty for a user who was never alerted', async () => {
+    const stranger = await otherUser({ phone: '+972505555555' });
+    await postSos();
+
+    expect((await getAlerts(stranger.auth)).body.alerts).toEqual([]);
   });
 });

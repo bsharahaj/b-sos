@@ -3,8 +3,10 @@ import { Link, useParams } from 'react-router-dom';
 import { STATUSES } from '@shared/constants.js';
 import { cancelSos, getSos } from '../api/sos.js';
 import { useAuth } from '../hooks/useAuth.js';
+import { useAlerts } from '../hooks/useAlerts.js';
 import EmergencyBar from '../components/EmergencyBar.jsx';
 import { SOS_TYPE_DETAILS, SosTypeIcon } from '../components/SosTypePicker.jsx';
+import { formatDistance, formatRating } from '../components/AlertCard.jsx';
 import LocationMap from '../components/LocationMap.jsx';
 import FormAlert from '../components/FormAlert.jsx';
 import Button from '../components/Button.jsx';
@@ -73,10 +75,81 @@ export default function ActiveSos() {
 
 function SosDetails({ sos, onChange }) {
   const { user } = useAuth();
+  const isRequester = sos.requester.id === user.id;
+  return isRequester ? <RequesterView sos={sos} onChange={onChange} /> : <HelperView sos={sos} />;
+}
+
+// What a helper who was alerted sees: who needs what, roughly where, and how far. The exact point is
+// only revealed after accepting (CLAUDE.md §4 privacy), which arrives with the accept step.
+function HelperView({ sos }) {
+  const { alerts } = useAlerts();
+  const alert = alerts.find((a) => a.sosId === sos.id);
+  const { label, hint } = SOS_TYPE_DETAILS[sos.type];
+  const isOpen = sos.status === STATUSES.OPEN;
+  const { location, requester } = sos;
+
+  return (
+    <>
+      <section className="flex items-start gap-4 rounded-3xl border border-sos/30 bg-sos/10 p-4 backdrop-blur">
+        <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-sos/15 text-sos">
+          <SosTypeIcon type={sos.type} />
+        </span>
+        <div>
+          <h1 className="text-xl font-semibold text-ink">{isOpen ? 'Someone nearby needs help' : 'This request is no longer open'}</h1>
+          <p className="mt-1 text-base text-ink-muted">
+            {label} · {hint}
+          </p>
+        </div>
+      </section>
+
+      <dl className="glass flex flex-col gap-4 rounded-3xl p-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <dt className="text-sm text-ink-muted">Requester</dt>
+            <dd className="text-base font-semibold text-ink">{requester.name}</dd>
+          </div>
+          <dd className="text-sm text-ink-muted">{formatRating(requester.ratingAvg)}</dd>
+        </div>
+        <div>
+          <dt className="text-sm text-ink-muted">Distance</dt>
+          <dd className="text-base font-semibold text-primary">{formatDistance(alert?.distanceM)}</dd>
+        </div>
+        <div>
+          <dt className="text-sm text-ink-muted">Sent</dt>
+          <dd className="text-base text-ink">
+            <time dateTime={sos.createdAt}>{new Date(sos.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time>
+          </dd>
+        </div>
+        {sos.description && (
+          <div>
+            <dt className="text-sm text-ink-muted">Their note</dt>
+            <dd className="whitespace-pre-line text-base text-ink">{sos.description}</dd>
+          </div>
+        )}
+      </dl>
+
+      {location?.lat !== undefined && (
+        <div className="flex flex-col gap-2">
+          <LocationMap
+            pin={{ lat: location.lat, lng: location.lng }}
+            accuracy={location.precision === 'APPROXIMATE' ? location.radiusM : location.accuracyM ?? null}
+            interactive={false}
+            className="h-56 w-full"
+          />
+          {location.precision === 'APPROXIMATE' && (
+            <p className="text-sm text-ink-muted">Approximate area. The exact location is shared with the helper who accepts.</p>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+function RequesterView({ sos, onChange }) {
   const { title, body } = STATUS_TEXT[sos.status];
   const isOpen = sos.status === STATUSES.OPEN;
   const { location } = sos;
-  const canCancel = sos.requester.id === user.id && REQUESTER_CANCELLABLE.includes(sos.status);
+  const canCancel = REQUESTER_CANCELLABLE.includes(sos.status);
 
   return (
     <>
