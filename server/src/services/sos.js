@@ -36,6 +36,7 @@ const SOS_SELECT = {
   resolvedAt: true,
   cancelledAt: true,
   requester: { select: REQUESTER_PUBLIC_SELECT },
+  helper: { select: { ...REQUESTER_PUBLIC_SELECT, helperProfile: { select: { verificationStatus: true } } } },
 };
 
 export async function createSos(userId, input) {
@@ -141,11 +142,17 @@ function canSeeExactLocation(sos, viewerId) {
 
 // Shapes an SOS for one viewer. The raw lat/lng never leave this function for other viewers.
 function toSosView(sos, viewerId) {
-  const { lat, lng, accuracyM, requesterId, helperId, ...rest } = sos;
+  const { lat, lng, accuracyM, requesterId, helperId, helper, ...rest } = sos;
 
   const location = canSeeExactLocation(sos, viewerId)
     ? { precision: 'EXACT', lat, lng, accuracyM }
     : { precision: 'APPROXIMATE', ...coarsen(lat, lng), radiusM: COARSE_RADIUS_M };
 
-  return { ...rest, location };
+  // Assigned helper's public card (null until accepted); `verified` replaces the raw profile status.
+  const helperView = helper
+    ? { ...helper, helperProfile: undefined, verified: helper.helperProfile?.verificationStatus === 'VERIFIED' }
+    : null;
+  if (helperView) delete helperView.helperProfile;
+
+  return { ...rest, helper: helperView, location };
 }

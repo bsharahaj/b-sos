@@ -14,3 +14,9 @@ export function emitToUser(userId, event, payload) {
 export function emitToSos(sosId, event, payload) {
   io?.to(`sos:${sosId}`).emit(event, payload);
 }
+
+// Puts every connected socket of a user into an SOS room (e.g. the helper who just accepted), so
+// status and location events for that SOS reach them from now on.
+export function joinUserToSos(userId, sosId) {
+  io?.in(`user:${userId}`).socketsJoin(`sos:${sosId}`);
+}

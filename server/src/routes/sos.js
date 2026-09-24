@@ -47,3 +47,16 @@ sosRouter.post('/:id/cancel', validate({ params: sosIdParams, body: cancelSchema
   const { sos } = await sosService.getSos(id, req.user.id);
   res.json({ sos: { ...sos, cancelledBy } });
 });
+
+// First helper to accept wins; the SOS row is locked inside a transaction (see sosLifecycle.acceptSos).
+sosRouter.post('/:id/accept', validate({ params: sosIdParams }), async (req, res) => {
+  const { id } = req.validated.params;
+  const { etaMin } = await lifecycle.acceptSos(id, req.user.id);
+  const { sos } = await sosService.getSos(id, req.user.id);
+  res.json({ sos, etaMin });
+});
+
+sosRouter.post('/:id/decline', validate({ params: sosIdParams }), async (req, res) => {
+  await lifecycle.declineSos(req.validated.params.id, req.user.id);
+  res.json({ ok: true });
+});

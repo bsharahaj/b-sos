@@ -406,3 +406,138 @@ describe('GET /sos/alerts', () => {
     expect((await getAlerts(stranger.auth)).body.alerts).toEqual([]);
   });
 });
+
+describe('POST /sos/:id/accept and /decline', () => {
+  const accept = (id, auth) => request(app).post(`/sos/${id}/accept`).set('Authorization', auth).send();
+  const decline = (id, auth) => request(app).post(`/sos/${id}/decline`).set('Authorization', auth).send();
+
+  let emitted;
+  beforeEach(async () => {
+    emitted = [];
+    const { setIo } = await import('../../src/socket/emitter.js');
+    setIo({
+      to: (room) => ({ emit: (event, payload) => emitted.push({ room, event, payload }) }),
+      in: () => ({ socketsJoin: () => {} }),
+    });
+  });
+
+  // n available GENERAL helpers 200–400 m away, so createSos alerts all of them.
+  async function alertedHelpers(n) {
+    const helpers = [];
+    for (let i = 0; i < n; i += 1) {
+      const h = await otherUser({ phone: `+97250600000${i}` });
+      await prisma.helperProfile.create({
+        data: { userId: h.user.id, skills: ['GENERAL'], isAvailable: true, lat: validSos.lat + 0.0018 + i * 0.0003, lng: validSos.lng, lastSeenAt: new Date() },
+      });
+      helpers.push(h);
+    }
+    return helpers;
+  }
+
+  it('assigns the helper, reveals the exact location and notifies everyone involved', async () => {
+    const [winner, loser] = await alertedHelpers(2);
+    const { body: created } = await postSos();
+    emitted = [];
+
+    const res = await accept(created.sos.id, winner.auth);
+
+    expect(res.status).toBe(200);
+    expect(res.body.sos).toMatchObject({ status: 'ACCEPTED', location: { precision: 'EXACT', lat: 32.08534 } });
+    expect(res.body.sos.helper).toMatchObject({ id: winner.user.id, name: winner.user.name, verified: false });
+    expect(res.body.etaMin).toBeGreaterThanOrEqual(1);
+
+    const stored = await prisma.sosRequest.findUnique({ where: { id: created.sos.id } });
+    expect(stored).toMatchObject({ status: 'ACCEPTED', helperId: winner.user.id });
+    expect(stored.acceptedAt).toBeTruthy();
+
+    const notes = await prisma.sosNotification.findMany({ where: { sosId: created.sos.id }, orderBy: { helperId: 'asc' } });
+    expect(notes.find((n) => n.helperId === winner.user.id).response).toBe('ACCEPT');
+    expect(notes.find((n) => n.helperId === loser.user.id).response).toBe('NONE');
+
+    expect(emitted).toEqual(
+      expect.arrayContaining([
+        { room: `user:${requester.id}`, event: 'sos:accepted', payload: expect.objectContaining({ sosId: created.sos.id, helper: expect.objectContaining({ id: winner.user.id }) }) },
+        { room: `user:${loser.user.id}`, event: 'sos:taken', payload: { sosId: created.sos.id } },
+        { room: `sos:${created.sos.id}`, event: 'sos:status', payload: expect.objectContaining({ status: 'ACCEPTED' }) },
+      ]),
+    );
+    // The requester sees the helper card too.
+    const view = await getSos(created.sos.id, requesterAuth);
+    expect(view.body.sos.helper.id).toBe(winner.user.id);
+  });
+
+  it('lets exactly one of several simultaneous accepts through (409 SOS_TAKEN for the rest)', async () => {
+    const helpers = await alertedHelpers(5);
+    const { body: created } = await postSos();
+
+    const results = await Promise.all(helpers.map((h) => accept(created.sos.id, h.auth)));
+    const statuses = results.map((r) => r.status);
+
+    expect(statuses.filter((s) => s === 200)).toHaveLength(1);
+    expect(statuses.filter((s) => s === 409)).toHaveLength(4);
+    expect(results.filter((r) => r.status === 409).every((r) => r.body.error.code === 'SOS_TAKEN')).toBe(true);
+    const stored = await prisma.sosRequest.findUnique({ where: { id: created.sos.id } });
+    expect(stored.helperId).toBe(results.find((r) => r.status === 200).body.sos.helper.id);
+  });
+
+  it('answers 404 to a helper who was never alerted', async () => {
+    const stranger = await otherUser({ phone: '+972507777777' });
+    const { body: created } = await postSos();
+
+    const res = await accept(created.sos.id, stranger.auth);
+
+    expect(res.status).toBe(404);
+    expect((await prisma.sosRequest.findUnique({ where: { id: created.sos.id } })).status).toBe('OPEN');
+  });
+
+  it('refuses a helper already busy with another SOS (409 HELPER_BUSY)', async () => {
+    const [helper] = await alertedHelpers(1);
+    const { body: first } = await postSos();
+    expect((await accept(first.sos.id, helper.auth)).status).toBe(200);
+
+    const second = await otherUser({ phone: '+972508888888', phoneVerified: true });
+    const { body: other } = await postSos(validSos, second.auth);
+    const res = await accept(other.sos.id, helper.auth);
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('HELPER_BUSY');
+    expect(res.body.error.details.activeSosId).toBe(first.sos.id);
+  });
+
+  it('refuses to accept a cancelled SOS (409 SOS_NOT_OPEN)', async () => {
+    const [helper] = await alertedHelpers(1);
+    const { body: created } = await postSos();
+    await request(app).post(`/sos/${created.sos.id}/cancel`).set('Authorization', requesterAuth).send({});
+
+    const res = await accept(created.sos.id, helper.auth);
+
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('SOS_NOT_OPEN');
+  });
+
+  it('decline records the answer, removes the alert from the list and cannot be repeated', async () => {
+    const [helper] = await alertedHelpers(1);
+    const { body: created } = await postSos();
+
+    expect((await decline(created.sos.id, helper.auth)).status).toBe(200);
+    const note = await prisma.sosNotification.findFirst({ where: { sosId: created.sos.id, helperId: helper.user.id } });
+    expect(note.response).toBe('DECLINE');
+    expect((await request(app).get('/sos/alerts').set('Authorization', helper.auth)).body.alerts).toEqual([]);
+
+    const again = await decline(created.sos.id, helper.auth);
+    expect(again.status).toBe(409);
+    expect(again.body.error.code).toBe('ALREADY_ANSWERED');
+  });
+
+  it('cancelling an OPEN SOS tells pending helpers it is taken', async () => {
+    const [helper] = await alertedHelpers(1);
+    const { body: created } = await postSos();
+    emitted = [];
+
+    await request(app).post(`/sos/${created.sos.id}/cancel`).set('Authorization', requesterAuth).send({});
+
+    expect(emitted).toEqual(
+      expect.arrayContaining([{ room: `user:${helper.user.id}`, event: 'sos:taken', payload: { sosId: created.sos.id } }]),
+    );
+  });
+});

@@ -19,6 +19,8 @@ All JSON. Errors: `{ "error": { "code", "message", "details?" } }`. Full contrac
 | POST | `/sos` | Bearer | Body `{ type: SOS_TYPES, lat (−90..90), lng (−180..180), accuracyM (≥0), description? (≤500), photoUrl? (https) }`; unknown keys rejected. Creates an `OPEN` SOS and alerts matching helpers (`sos:new` socket event + `SosNotification` rows, round 1). `201 { sos }`. `403 PHONE_NOT_VERIFIED`, `403 ACCOUNT_SUSPENDED`, `409 ACTIVE_SOS_EXISTS` (already has one `OPEN`/`ACCEPTED`/`EN_ROUTE`/`ARRIVED`; details `{ activeSosId, status }` so the client can open it), `429 SOS_DAILY_LIMIT` (3 created in the last 24 h, any status) |
 | GET | `/sos/alerts` | Bearer | Open SOS the caller was alerted about (as a helper) and hasn't answered, newest first. `200 { alerts: [{ sentAt, distanceM \| null, sos }] }`; `sos` is the *SOS object* with an approximate location; `distanceM` is from the helper's last known position |
 | GET | `/sos/:id` | Bearer | `200 { sos }` — see *SOS object*. Readable by the requester, the assigned helper, and helpers who were alerted about it; everyone else gets `404 SOS_NOT_FOUND` (also for unknown ids). `400` if `id` is not a UUID |
+| POST | `/sos/:id/accept` | Bearer | Only a helper who was alerted (others get `404`). Exactly one helper wins: the row is locked in a transaction. Sets `ACCEPTED`, `helperId`, `acceptedAt`; emits `sos:accepted` to the requester, `sos:taken` to other alerted helpers, `sos:status` to the SOS room. `200 { sos (EXACT location), etaMin \| null }`. `409 SOS_TAKEN` (someone else won), `409 SOS_NOT_OPEN` (cancelled/resolved), `409 HELPER_BUSY` (details `activeSosId`), `403 OWN_SOS`, `403 ACCOUNT_SUSPENDED` |
+| POST | `/sos/:id/decline` | Bearer | Marks the caller's alert as declined; the SOS is untouched. `200 { ok: true }`. `409 ALREADY_ANSWERED`, `404` if never alerted |
 | POST | `/sos/:id/cancel` | Bearer | Body `{ reason? (≤200) }`. Requester may cancel while `OPEN`/`ACCEPTED`; the assigned helper while `ACCEPTED`/`EN_ROUTE`. Sets `CANCELLED`, `cancelledAt`, `cancelledBy`, `cancelReason`. `200 { sos }` (see *SOS object*, plus `cancelledBy: "REQUESTER" \| "HELPER"`). `403 NOT_YOUR_SOS`, `409 SOS_NOT_CANCELLABLE` (already resolved/cancelled, helper arrived, or — for the requester — helper already en route), `404 SOS_NOT_FOUND` |
 
 ## Auth
@@ -36,6 +38,8 @@ All JSON. Errors: `{ "error": { "code", "message", "details?" } }`. Full contrac
   "id": "uuid", "type": "MEDICAL", "description": "…", "photoUrl": null, "status": "OPEN",
   "createdAt": "…", "acceptedAt": null, "enRouteAt": null, "arrivedAt": null, "resolvedAt": null, "cancelledAt": null,
   "requester": { "id": "uuid", "name": "…", "photoUrl": null, "ratingAvg": 0, "ratingCount": 0 },
+  "helper": null,
+  "helper (once accepted)": { "id": "uuid", "name": "…", "photoUrl": null, "ratingAvg": 4.8, "ratingCount": 12, "verified": false },
   "location": { "precision": "EXACT", "lat": 32.08534, "lng": 34.78176, "accuracyM": 14 }
 }
 ```
