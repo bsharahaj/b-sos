@@ -4,6 +4,7 @@ import { SOS_TYPES } from '../../../shared/constants.js';
 import { requireAuth } from '../middleware/requireAuth.js';
 import { validate } from '../middleware/validate.js';
 import * as sosService from '../services/sos.js';
+import * as lifecycle from '../services/sosLifecycle.js';
 
 // ---------- Schemas ----------
 
@@ -19,6 +20,8 @@ const createSosSchema = z.strictObject({
 
 const sosIdParams = z.object({ id: z.uuid('Invalid SOS id.') });
 
+const cancelSchema = z.strictObject({ reason: z.string().trim().max(200).optional() });
+
 // ---------- Routes ----------
 
 export const sosRouter = Router();
@@ -31,4 +34,11 @@ sosRouter.post('/', validate({ body: createSosSchema }), async (req, res) => {
 
 sosRouter.get('/:id', validate({ params: sosIdParams }), async (req, res) => {
   res.json(await sosService.getSos(req.validated.params.id, req.user.id));
+});
+
+sosRouter.post('/:id/cancel', validate({ params: sosIdParams, body: cancelSchema }), async (req, res) => {
+  const { id } = req.validated.params;
+  const { cancelledBy } = await lifecycle.cancelSos(id, req.user.id, req.body.reason);
+  const { sos } = await sosService.getSos(id, req.user.id);
+  res.json({ sos: { ...sos, cancelledBy } });
 });

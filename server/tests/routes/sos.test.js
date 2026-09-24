@@ -272,3 +272,82 @@ describe('GET /sos/:id', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('POST /sos/:id/cancel', () => {
+  const cancel = (id, auth = requesterAuth, body = {}) => request(app).post(`/sos/${id}/cancel`).set('Authorization', auth).send(body);
+
+  it('lets the requester cancel an OPEN SOS with a reason', async () => {
+    const { body: created } = await postSos();
+
+    const res = await cancel(created.sos.id, requesterAuth, { reason: 'Got help another way' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.sos).toMatchObject({ id: created.sos.id, status: 'CANCELLED', cancelledBy: 'REQUESTER' });
+    expect(res.body.sos.cancelledAt).toBeTruthy();
+
+    const stored = await prisma.sosRequest.findUnique({ where: { id: created.sos.id } });
+    expect(stored).toMatchObject({ status: 'CANCELLED', cancelledBy: requester.id, cancelReason: 'Got help another way' });
+  });
+
+  it('frees the requester to send a new SOS afterwards', async () => {
+    const { body: created } = await postSos();
+    await cancel(created.sos.id);
+
+    const res = await postSos();
+    expect(res.status).toBe(201);
+  });
+
+  it('lets the requester cancel while ACCEPTED but not once the helper is EN_ROUTE', async () => {
+    const helper = await otherUser({ phone: '+972502222222' });
+    const { body: created } = await postSos();
+    await prisma.sosRequest.update({ where: { id: created.sos.id }, data: { status: 'ACCEPTED', helperId: helper.user.id, acceptedAt: new Date() } });
+
+    expect((await cancel(created.sos.id)).status).toBe(200);
+
+    const { body: second } = await postSos();
+    await prisma.sosRequest.update({ where: { id: second.sos.id }, data: { status: 'EN_ROUTE', helperId: helper.user.id } });
+    const res = await cancel(second.sos.id);
+    expect(res.status).toBe(409);
+    expect(res.body.error.code).toBe('SOS_NOT_CANCELLABLE');
+  });
+
+  it('lets the assigned helper cancel while EN_ROUTE and records them as HELPER', async () => {
+    const helper = await otherUser({ phone: '+972502222222' });
+    const { body: created } = await postSos();
+    await prisma.sosRequest.update({ where: { id: created.sos.id }, data: { status: 'EN_ROUTE', helperId: helper.user.id } });
+
+    const res = await cancel(created.sos.id, helper.auth);
+
+    expect(res.status).toBe(200);
+    expect(res.body.sos.cancelledBy).toBe('HELPER');
+  });
+
+  it('rejects anyone who is neither the requester nor the assigned helper', async () => {
+    const stranger = await otherUser({ phone: '+972503333333' });
+    const { body: created } = await postSos();
+
+    const res = await cancel(created.sos.id, stranger.auth);
+
+    expect(res.status).toBe(403);
+    expect(res.body.error.code).toBe('NOT_YOUR_SOS');
+    expect((await prisma.sosRequest.findUnique({ where: { id: created.sos.id } })).status).toBe('OPEN');
+  });
+
+  it('refuses to cancel a resolved or already-cancelled SOS', async () => {
+    const { body: resolved } = await postResolvedSos();
+    expect((await cancel(resolved.sos.id)).body.error.code).toBe('SOS_NOT_CANCELLABLE');
+
+    const { body: created } = await postSos();
+    await cancel(created.sos.id);
+    const again = await cancel(created.sos.id);
+    expect(again.status).toBe(409);
+    expect(again.body.error.message).toMatch(/already cancelled/i);
+  });
+
+  it('validates the reason length and the id', async () => {
+    const { body: created } = await postSos();
+    expect((await cancel(created.sos.id, requesterAuth, { reason: 'x'.repeat(201) })).status).toBe(400);
+    expect((await cancel('not-a-uuid')).status).toBe(400);
+    expect((await cancel('00000000-0000-4000-8000-000000000000')).status).toBe(404);
+  });
+});

@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { STATUSES } from '@shared/constants.js';
-import { getSos } from '../api/sos.js';
+import { cancelSos, getSos } from '../api/sos.js';
+import { useAuth } from '../hooks/useAuth.js';
 import EmergencyBar from '../components/EmergencyBar.jsx';
 import { SOS_TYPE_DETAILS, SosTypeIcon } from '../components/SosTypePicker.jsx';
 import LocationMap from '../components/LocationMap.jsx';
@@ -14,8 +15,13 @@ const STATUS_TEXT = {
   [STATUSES.EN_ROUTE]: { title: 'Help is on the way', body: 'Your helper is coming to you.' },
   [STATUSES.ARRIVED]: { title: 'Your helper has arrived', body: 'Your helper is at your location.' },
   [STATUSES.RESOLVED]: { title: 'Resolved', body: 'This SOS is closed. We hope you are okay.' },
-  [STATUSES.CANCELLED]: { title: 'Cancelled', body: 'This SOS was cancelled.' },
+  [STATUSES.CANCELLED]: { title: 'Cancelled', body: 'This SOS was cancelled. You can send a new one any time.' },
 };
+
+// Mirrors the server: the requester may cancel while OPEN or ACCEPTED.
+const REQUESTER_CANCELLABLE = [STATUSES.OPEN, STATUSES.ACCEPTED];
+
+const CANCEL_REASONS = ['Got help another way', 'Sent by mistake', 'No longer needed'];
 
 // Shows one SOS. Live updates (helper accepted, helper position) arrive with the real-time step.
 export default function ActiveSos() {
@@ -59,16 +65,18 @@ export default function ActiveSos() {
           </>
         )}
         {!sos && !loadError && <p role="status" className="text-ink-muted">Loading your SOS…</p>}
-        {sos && <SosDetails sos={sos} />}
+        {sos && <SosDetails sos={sos} onChange={setSos} />}
       </main>
     </>
   );
 }
 
-function SosDetails({ sos }) {
+function SosDetails({ sos, onChange }) {
+  const { user } = useAuth();
   const { title, body } = STATUS_TEXT[sos.status];
   const isOpen = sos.status === STATUSES.OPEN;
   const { location } = sos;
+  const canCancel = sos.requester.id === user.id && REQUESTER_CANCELLABLE.includes(sos.status);
 
   return (
     <>
@@ -115,6 +123,101 @@ function SosDetails({ sos }) {
           className="h-56 w-full"
         />
       )}
+
+      {canCancel && <CancelPanel sosId={sos.id} onCancelled={(cancelled) => onChange(cancelled)} />}
+
+      {sos.status === STATUSES.CANCELLED && (
+        <Link
+          to="/"
+          className="inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-primary px-5 font-semibold text-on-primary shadow-glow-primary hover:bg-primary-hover focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          Back to home
+        </Link>
+      )}
     </>
+  );
+}
+
+// Two-step cancel: a quiet link first, then a panel with quick reasons and a clear confirm button.
+// Cancel is deliberately not red: red means SOS in this app.
+function CancelPanel({ sosId, onCancelled }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const panelRef = useRef(null);
+
+  useEffect(() => {
+    if (open) panelRef.current?.focus();
+  }, [open]);
+
+  const confirm = async () => {
+    setError('');
+    setSubmitting(true);
+    try {
+      const { sos } = await cancelSos(sosId, reason || undefined);
+      onCancelled(sos);
+    } catch (err) {
+      setError(err.message);
+      setSubmitting(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="min-h-11 self-center text-sm font-medium text-ink-muted underline-offset-4 hover:text-ink hover:underline focus-visible:outline-3 focus-visible:outline-primary"
+      >
+        I don't need help anymore
+      </button>
+    );
+  }
+
+  return (
+    <section
+      ref={panelRef}
+      tabIndex={-1}
+      aria-labelledby="cancel-heading"
+      className="glass flex flex-col gap-4 rounded-3xl p-4 focus:outline-none"
+    >
+      <div>
+        <h2 id="cancel-heading" className="text-lg font-medium text-ink">
+          Cancel this SOS?
+        </h2>
+        <p className="mt-1 text-sm text-ink-muted">Helpers will stop being alerted. Tell us why, if you like.</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Reason">
+        {CANCEL_REASONS.map((option) => {
+          const selected = reason === option;
+          return (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => setReason(selected ? '' : option)}
+              className={`min-h-11 rounded-full border px-4 text-sm font-medium transition-colors focus-visible:outline-3 focus-visible:outline-primary ${
+                selected ? 'border-primary bg-primary-soft text-primary' : 'border-line-strong text-ink hover:bg-surface-strong'
+              }`}
+            >
+              {option}
+            </button>
+          );
+        })}
+      </div>
+
+      {error && <FormAlert>{error}</FormAlert>}
+
+      <div className="flex flex-col gap-2">
+        <Button onClick={confirm} loading={submitting}>
+          {submitting ? 'Cancelling…' : 'Yes, cancel my SOS'}
+        </Button>
+        <Button variant="secondary" onClick={() => setOpen(false)} disabled={submitting}>
+          Keep it open
+        </Button>
+      </div>
+    </section>
   );
 }

@@ -18,6 +18,7 @@ All JSON. Errors: `{ "error": { "code", "message", "details?" } }`. Full contrac
 | PATCH | `/me/helper` | Bearer | Body: any of `{ skills: SKILLS[], isAvailable: boolean }`, at least one; duplicates removed. Creates the profile on first call. Going available sets `lastSeenAt`. `200 { helperProfile }`. `400 SKILLS_REQUIRED` (available with no skills), `403 ACCOUNT_SUSPENDED` (suspended/banned user going available) |
 | POST | `/sos` | Bearer | Body `{ type: SOS_TYPES, lat (−90..90), lng (−180..180), accuracyM (≥0), description? (≤500), photoUrl? (https) }`; unknown keys rejected. Creates an `OPEN` SOS. `201 { sos }`. `403 PHONE_NOT_VERIFIED`, `403 ACCOUNT_SUSPENDED`, `409 ACTIVE_SOS_EXISTS` (already has one `OPEN`/`ACCEPTED`/`EN_ROUTE`/`ARRIVED`; details `{ activeSosId, status }` so the client can open it), `429 SOS_DAILY_LIMIT` (3 created in the last 24 h, any status) |
 | GET | `/sos/:id` | Bearer | `200 { sos }` — see *SOS object*. `404 SOS_NOT_FOUND`, `400` if `id` is not a UUID |
+| POST | `/sos/:id/cancel` | Bearer | Body `{ reason? (≤200) }`. Requester may cancel while `OPEN`/`ACCEPTED`; the assigned helper while `ACCEPTED`/`EN_ROUTE`. Sets `CANCELLED`, `cancelledAt`, `cancelledBy`, `cancelReason`. `200 { sos }` (see *SOS object*, plus `cancelledBy: "REQUESTER" \| "HELPER"`). `403 NOT_YOUR_SOS`, `409 SOS_NOT_CANCELLABLE` (already resolved/cancelled, helper arrived, or — for the requester — helper already en route), `404 SOS_NOT_FOUND` |
 
 ## Auth
 

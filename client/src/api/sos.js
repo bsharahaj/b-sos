@@ -10,6 +10,16 @@ export async function createSos(input) {
   }
 }
 
+// reason is optional. Resolves to { sos } with status CANCELLED.
+export async function cancelSos(id, reason) {
+  try {
+    const { data } = await http.post(`/sos/${id}/cancel`, reason ? { reason } : {});
+    return data;
+  } catch (err) {
+    throw toApiError(err);
+  }
+}
+
 // Resolves to { sos }.
 export async function getSos(id) {
   try {
