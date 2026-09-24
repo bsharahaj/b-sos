@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { SOS_TYPES } from '@shared/constants.js';
 import { useAuth } from '../hooks/useAuth.js';
 import Button from '../components/Button.jsx';
 
@@ -25,14 +24,16 @@ export default function Home() {
           </p>
         </div>
       )}
-      <section aria-labelledby="types-heading">
-        <h2 id="types-heading" className="font-semibold">SOS types</h2>
-        <ul className="list-inside list-disc text-gray-700">
-          {Object.values(SOS_TYPES).map((type) => (
-            <li key={type}>{type}</li>
-          ))}
-        </ul>
-      </section>
+      <div className="flex flex-col items-center gap-3 py-6">
+        <Link
+          to="/sos/new"
+          aria-label="SOS, ask for help"
+          className="flex size-44 items-center justify-center rounded-full bg-sos text-4xl font-bold tracking-wide text-white shadow-lg ring-8 ring-sos/15 hover:bg-sos-hover focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-ink"
+        >
+          SOS
+        </Link>
+        <p className="text-base text-ink-muted">Tap to ask for help nearby</p>
+      </div>
       <Link
         to="/profile"
         className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-5 text-base font-semibold text-white hover:bg-primary-hover focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-primary"

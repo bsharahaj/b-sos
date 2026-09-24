@@ -5,6 +5,8 @@ import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import VerifyPhone from './pages/VerifyPhone.jsx';
 import Profile from './pages/Profile.jsx';
+import CreateSos from './pages/CreateSos.jsx';
+import ActiveSos from './pages/ActiveSos.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 export default function App() {
@@ -19,6 +21,8 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/verify-phone" element={<VerifyPhone />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/sos/new" element={<CreateSos />} />
+        <Route path="/sos/:id" element={<ActiveSos />} />
       </Route>
 
       <Route path="*" element={<NotFound />} />
