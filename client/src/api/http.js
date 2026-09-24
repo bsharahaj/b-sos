@@ -8,6 +8,11 @@ export function setAccessToken(token) {
   accessToken = token;
 }
 
+// For the socket handshake, which can't use the axios interceptor.
+export function getAccessToken() {
+  return accessToken;
+}
+
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_URL,
   // Needed so the browser stores and sends the refresh_token cookie across origins.

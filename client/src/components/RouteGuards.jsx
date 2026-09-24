@@ -1,14 +1,21 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
+import HelperPresence from './HelperPresence.jsx';
 
 // Wrap routes that need a signed-in user. Remembers where the user was going so Login can send them back.
+// HelperPresence lives here so an available helper shares their location on every signed-in screen.
 export function RequireAuth() {
   const { status } = useAuth();
   const location = useLocation();
 
   if (status === 'loading') return <SessionLoading />;
   if (status === 'anonymous') return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
-  return <Outlet />;
+  return (
+    <>
+      <HelperPresence />
+      <Outlet />
+    </>
+  );
 }
 
 // Wrap Login/Register so a signed-in user who opens them goes straight to the app.

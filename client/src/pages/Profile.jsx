@@ -189,6 +189,7 @@ function DetailsSection({ user }) {
 // ---------- Helping others ----------
 
 function HelperSection({ helperProfile }) {
+  const { setHelperProfile } = useAuth();
   const initial = { skills: helperProfile?.skills ?? [], isAvailable: helperProfile?.isAvailable ?? false };
   const [skills, setSkills] = useState(initial.skills);
   const [isAvailable, setIsAvailable] = useState(initial.isAvailable);
@@ -224,6 +225,7 @@ function HelperSection({ helperProfile }) {
       setSkills(updated.skills);
       setIsAvailable(updated.isAvailable);
       setSavedState({ skills: updated.skills, isAvailable: updated.isAvailable });
+      setHelperProfile(updated); // starts/stops location sharing app-wide (HelperPresence)
       setSaved(true);
     } catch (err) {
       if (err.code === 'SKILLS_REQUIRED') setSkillsError(err.message);
@@ -243,7 +245,11 @@ function HelperSection({ helperProfile }) {
 
         <Switch
           label="I'm available to help"
-          description={isAvailable ? 'You can get alerts for SOS requests near you.' : "You won't get any SOS alerts."}
+          description={
+            isAvailable
+              ? 'You can get alerts for SOS requests near you. While the app is open, your location is shared so nearby requests can find you.'
+              : "You won't get any SOS alerts and your location isn't shared."
+          }
           checked={isAvailable}
           onChange={(next) => {
             setIsAvailable(next);

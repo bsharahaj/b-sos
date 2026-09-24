@@ -11,8 +11,9 @@ function greeting() {
 }
 
 export default function Home() {
-  const { user, logout } = useAuth();
+  const { user, helperProfile, logout } = useAuth();
   const firstName = user.name.trim().split(/\s+/)[0];
+  const helping = Boolean(helperProfile?.isAvailable);
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))]">
@@ -96,7 +97,10 @@ export default function Home() {
           className="glass flex min-h-24 flex-col justify-between rounded-2xl p-4 hover:bg-surface-strong focus-visible:outline-3 focus-visible:outline-primary"
         >
           <span className="text-sm text-ink-muted">Helping others</span>
-          <span className="text-base font-semibold text-primary">Helper settings</span>
+          <span className="flex items-center gap-2 text-base font-semibold text-ink">
+            {helping && <span aria-hidden="true" className="inline-flex size-2.5 rounded-full bg-primary" />}
+            {helperProfile === undefined ? '…' : helping ? 'Available' : 'Not available'}
+          </span>
         </Link>
         <div className="glass flex min-h-24 flex-col justify-between rounded-2xl p-4">
           <span className="text-sm text-ink-muted">Emergency</span>
